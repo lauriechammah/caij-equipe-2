@@ -4,6 +4,7 @@ Même logique que scripts/compagnon.py et scripts/augure.py, mais les erreurs
 lèvent des exceptions au lieu d'appeler sys.exit (utilisable dans un serveur).
 """
 
+import http.client
 import json
 import os
 import urllib.error
@@ -74,7 +75,8 @@ def augure_chat(prompt, system=None, model=None, effort="low", max_tokens=64000)
     """Envoie un prompt texte à Augure (streaming SSE) et renvoie la réponse complète.
 
     Si le modèle épuise son budget en raisonnement sans répondre (reasoning_cutoff),
-    l'appel est refait une fois sans raisonnement.
+    l'appel est refait une fois sans raisonnement. Si la connexion tombe pendant un
+    long raisonnement, il est refait une fois avec moins de raisonnement.
     """
     try:
         return _augure_chat(prompt, system, model, effort, max_tokens)
@@ -82,6 +84,13 @@ def augure_chat(prompt, system=None, model=None, effort="low", max_tokens=64000)
         if "reasoning_cutoff" not in str(e) or effort == "none":
             raise
         return _augure_chat(prompt, system, model, "none", max_tokens)
+    except (OSError, http.client.HTTPException) as e:
+        if effort in ("low", "none"):
+            raise AugureError(f"Connexion à Augure interrompue : {e}") from e
+        try:
+            return _augure_chat(prompt, system, model, "low", max_tokens)
+        except (OSError, http.client.HTTPException) as e2:
+            raise AugureError(f"Connexion à Augure interrompue : {e2}") from e2
 
 
 def _augure_chat(prompt, system, model, effort, max_tokens):
