@@ -54,7 +54,19 @@ def search(query, types, top_k, summary, clarifications=None):
     sys.exit("Aucun résultat reçu du Compagnon")
 
 
-def format_results(result, types, top_k, summary):
+def snippet(content, limit):
+    text = " ".join(str(content or "").split())
+    return text if limit <= 0 else text[:limit]
+
+
+def chunk_index(doc):
+    for line in str(doc.get("content") or "")[:80].splitlines():
+        if line.startswith("CHUNK INDEX:"):
+            return line.split(":", 1)[1].strip()
+    return "?"
+
+
+def format_results(result, types, top_k, summary, chars, all_docs):
     lines = []
     if summary and result.get("textual_summary"):
         lines += ["## Résumé", str(result["textual_summary"]), ""]
@@ -62,9 +74,12 @@ def format_results(result, types, top_k, summary):
         if kind not in types or not docs:
             continue
         lines.append(f"## {kind} ({len(docs)})")
-        for doc in docs[:top_k]:
-            snippet = " ".join(str(doc.get("content", "")).split())[:300]
-            lines.append(f"- {doc.get('title')}\n  {doc.get('original_url') or doc.get('url')}\n  {snippet}")
+        for doc in docs if all_docs else docs[:top_k]:
+            score = doc.get("score")
+            head = f"- {doc.get('title')}"
+            if score is not None:
+                head += f"  [score {score:.3f} · chunk {chunk_index(doc)}]"
+            lines.append(f"{head}\n  {doc.get('original_url') or doc.get('url')}\n  {snippet(doc.get('content'), chars)}")
         lines.append("")
     return "\n".join(lines)
 
@@ -73,9 +88,11 @@ def main():
     parser = argparse.ArgumentParser(description="Recherche dans les sources du CAIJ.")
     parser.add_argument("query", help="La recherche en langage naturel")
     parser.add_argument("--types", nargs="+", choices=TYPES, default=["legislation", "jurisprudence", "doctrine"])
-    parser.add_argument("--top-k", type=int, default=5, help="Résultats par type (1 à 100)")
+    parser.add_argument("--top-k", type=int, default=5, help="Résultats affichés par type (1 à 100)")
     parser.add_argument("--summary", action="store_true", help="Demander l'analyse et le résumé du Compagnon (plus lent)")
     parser.add_argument("--clarifications", help="Précisions pour reformuler la requête")
+    parser.add_argument("--chars", type=int, default=300, help="Caractères d'extrait par résultat (0 = texte intégral)")
+    parser.add_argument("--all", action="store_true", help="Afficher tous les résultats reçus, pas seulement top-k")
     parser.add_argument("--json", action="store_true", help="Sortie JSON brute")
     parser.add_argument("--out", help="Écrire la sortie dans ce fichier")
     args = parser.parse_args()
@@ -84,7 +101,7 @@ def main():
     if args.json:
         output = json.dumps(result, ensure_ascii=False, indent=2)
     else:
-        output = format_results(result, args.types, args.top_k, args.summary)
+        output = format_results(result, args.types, args.top_k, args.summary, args.chars, args.all)
 
     if args.out:
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
