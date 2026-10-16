@@ -85,10 +85,16 @@ revient avec une url vide plutôt qu'avec une référence inventée.
 `create_acte_modifie` fait proposer à Augure un plan — `ajouts`, `surlignages`, `signalees`,
 chacun avec une ancre citant le modèle mot pour mot — puis **le code** l'applique.
 
-Comme l'exige le prompt : le texte du modèle n'est jamais supprimé ni reformulé.
+Le modèle est respecté à la lettre : son texte n'est jamais supprimé ni reformulé (un
+remplacement ou une suppression proposés deviennent un passage surligné avec une note).
 
+- les **3 pages liminaires** du modèle (mise en garde, droits d'auteur…) sont retirées dès le
+  chargement : Augure ne les reçoit pas, aucune ancre n'y tombe, l'acte commence à la page 4.
+  Augure reçoit le texte du `.docx` (et non le PDF) : ses ancres citent le document complété ;
 - chaque **ajout** est **rouge** et en révision suivie : Word l'affiche comme une insertion,
-  avec l'auteur « Assistant CAIJ — équipe 2 » ;
+  avec l'auteur « Assistant CAIJ — équipe 2 ». Il prend la **police et la taille** du
+  paragraphe d'ancrage (ou du paragraphe courant du modèle si l'ancre est un titre), comme
+  les notes et l'annexe ;
 - un **[À COMPLÉTER : …]** reste en rouge quand une information manque, avec sa note ;
 - les passages touchés par une contradiction ou une conséquence sont **surlignés** (jaune,
   vert, cyan, rose), portent un **commentaire Word** et une **note courte à côté** ;

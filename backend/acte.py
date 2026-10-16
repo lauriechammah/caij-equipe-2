@@ -6,11 +6,14 @@
 Le modèle propose un plan de modifications ; c'est le code qui l'applique, pour
 que le résultat soit reproductible et que rien ne soit appliqué en silence.
 
-Dans le document produit :
+Dans le document produit, le modèle est respecté à la lettre :
 
+- les 3 pages liminaires du modèle (mise en garde, droits d'auteur…) sont retirées
+  et ne sont jamais envoyées à Augure ;
+- le texte du modèle n'est jamais modifié ni supprimé ; un remplacement ou une
+  suppression proposés deviennent un passage surligné avec une note ;
 - les ajouts sont des révisions suivies (Word les affiche comme des insertions,
-  avec leur auteur) ;
-- les suppressions et remplacements sont eux aussi tracés ;
+  avec leur auteur), en rouge, dans la police et la taille du modèle ;
 - les passages à vérifier sont surlignés et portent un commentaire Word ;
 - une annexe reprend les questions à trancher, les conséquences et leurs urls,
   et tout ce qui n'a pas pu être appliqué.
@@ -22,6 +25,7 @@ Deux points d'entrée : ``create_acte_modifie`` (plan par Augure) et
 import json
 import re
 import unicodedata
+from collections import Counter
 from copy import deepcopy
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
@@ -51,6 +55,9 @@ COULEURS = {
     "rouge": WD_COLOR_INDEX.RED,
 }
 SEUIL_SIMILARITE = 0.82
+# Pages liminaires du Répertoire (mise en garde, droits d'auteur, citation…) : jamais lues,
+# jamais modifiées, absentes de l'acte produit.
+PAGES_LIMINAIRES = 3
 _dernier_id = [1000]
 
 
@@ -235,15 +242,120 @@ def _baliser(runs, element):
     return enveloppe
 
 
-def _inserer(document, apres, texte, note=None):
-    """Ajoute une clause après le paragraphe ``apres``, en rouge et en révision suivie."""
+# --- Pages liminaires --------------------------------------------------------
+
+def _finit_la_page(element):
+    """Saut de page explicite, ou fin de section, dans cet élément du corps."""
+    sauts = [b for b in element.iter(qn("w:br")) if b.get(qn("w:type")) == "page"]
+    return bool(sauts) or element.find(qn("w:pPr") + "/" + qn("w:sectPr")) is not None
+
+
+def _debut_de_page(elements, numero):
+    """Indice du premier élément de la page ``numero`` (1 = première page), ou None.
+
+    Les débuts de page sont ceux que Word a mémorisés au dernier enregistrement
+    (w:lastRenderedPageBreak) ; à défaut, les sauts de page et de section explicites.
+    """
+    rendus = [i for i, el in enumerate(elements)
+              if el.find(".//" + qn("w:lastRenderedPageBreak")) is not None]
+    if len(rendus) >= numero - 1:
+        return rendus[numero - 2]
+    debuts = [i for i, el in enumerate(elements) if i and (
+        el.find(".//" + qn("w:pageBreakBefore")) is not None or _finit_la_page(elements[i - 1]))]
+    return debuts[numero - 2] if len(debuts) >= numero - 1 else None
+
+
+def retirer_pages_liminaires(document, pages=PAGES_LIMINAIRES):
+    """Retire les ``pages`` premières pages du modèle. Renvoie le nombre d'éléments retirés."""
+    corps = document.element.body
+    elements = [el for el in corps if el.tag != qn("w:sectPr")]
+    debut = _debut_de_page(elements, pages + 1)
+    for element in elements[:debut or 0]:
+        corps.remove(element)
+    return debut or 0
+
+
+# --- Mise en forme du modèle ---------------------------------------------------
+
+def _run_modele(paragraphe):
+    """Le premier run de texte du paragraphe (élément w:r), ou None."""
+    for run in paragraphe._p.iter(qn("w:r")):
+        if _texte_run(run).strip():
+            return run
+    return None
+
+
+def _est_titre(paragraphe):
+    style = paragraphe._p.pPr.pStyle if paragraphe._p.pPr is not None else None
+    nom = (style.val if style is not None else "").lower()
+    texte = _texte(paragraphe).strip()
+    return any(m in nom for m in ("titre", "title", "heading")) or (texte.isupper() and len(texte) < 90)
+
+
+def reference(document):
+    """Le paragraphe courant du modèle : style et format de texte les plus fréquents."""
+    formats, exemples = Counter(), {}
+    for paragraphe, _ in _paragraphes(document):
+        run = _run_modele(paragraphe)
+        if run is None or _est_titre(paragraphe):
+            continue
+        rpr = run.find(qn("w:rPr"))
+        police = rpr.find(qn("w:rFonts")) if rpr is not None else None
+        taille = rpr.find(qn("w:sz")) if rpr is not None else None
+        style = paragraphe._p.pPr.pStyle if paragraphe._p.pPr is not None else None
+        cle = (style.val if style is not None else "",
+               police.get(qn("w:ascii")) if police is not None else "",
+               taille.get(qn("w:val")) if taille is not None else "")
+        formats[cle] += 1
+        exemples.setdefault(cle, paragraphe)
+    return exemples[formats.most_common(1)[0][0]] if formats else None
+
+
+def _paragraphe_comme(document, gabarit):
+    """Nouveau paragraphe (hors du corps) avec la mise en page de ``gabarit``.
+
+    Ni saut de section, ni numérotation, ni saut de page : la structure du modèle
+    ne change pas.
+    """
+    paragraphe = document.add_paragraph()
+    paragraphe._p.getparent().remove(paragraphe._p)
+    if gabarit is not None and gabarit._p.pPr is not None:
+        ppr = deepcopy(gabarit._p.pPr)
+        for balise in ("w:sectPr", "w:numPr", "w:pageBreakBefore"):
+            for element in ppr.findall(qn(balise)):
+                ppr.remove(element)
+        paragraphe._p.insert(0, ppr)
+    return paragraphe
+
+
+def _ecrire(paragraphe, texte, gabarit=None):
+    """Ajoute du texte en rouge, avec la police et la taille du run ``gabarit`` du modèle."""
+    run = paragraphe.add_run(texte)
+    origine = gabarit.find(qn("w:rPr")) if gabarit is not None else None
+    if origine is not None:
+        rpr = OxmlElement("w:rPr")
+        for balise in ("w:rFonts", "w:sz", "w:szCs", "w:lang"):
+            element = origine.find(qn(balise))
+            if element is not None:
+                rpr.append(deepcopy(element))
+        run._r.insert(0, rpr)
+    run.font.color.rgb = COULEUR_AJOUT
+    return run
+
+
+def _inserer(document, apres, texte, note=None, modele=None):
+    """Ajoute une clause après le paragraphe ``apres``, en rouge et en révision suivie.
+
+    La clause prend la mise en forme du paragraphe d'ancrage, ou celle du paragraphe
+    courant du modèle (``modele``) si l'ancre est un titre.
+    """
     ancre, _, _ = _trouver(document, apres)
     if ancre is None:
         return None
-    paragraphe = document.add_paragraph()
+    gabarit = modele if _est_titre(ancre) and modele is not None else ancre
+    paragraphe = _paragraphe_comme(document, gabarit)
     ancre._p.addnext(paragraphe._p)
-    run = paragraphe.add_run(texte.strip())
-    run.font.color.rgb = COULEUR_AJOUT
+    run = _ecrire(paragraphe, texte.strip(), _run_modele(gabarit))
     _baliser([run], "ins")
     if note:
         _commenter(document, [run], note)
@@ -252,15 +364,14 @@ def _inserer(document, apres, texte, note=None):
 
 
 def _note_en_marge(paragraphe, apres, note):
-    """La courte note demandée à côté du passage, dans la couleur des ajouts."""
+    """La courte note demandée à côté du passage, en rouge, dans la police du passage."""
     texte = " ".join(str(note).split())
     if len(texte) > LONGUEUR_NOTE:
         texte = texte[:LONGUEUR_NOTE - 1].rstrip() + "…"
     if not texte:
         return None
-    run = paragraphe.add_run("  [Note : " + texte + "]")
+    run = _ecrire(paragraphe, "  [Note : " + texte + "]", apres._r if apres is not None else None)
     run.italic = True
-    run.font.color.rgb = COULEUR_AJOUT
     return run
 
 
@@ -306,47 +417,21 @@ def _position_reelle(texte, ancre):
     return debut, debut + len(normalise)
 
 
-def _remplacer(document, cible, texte, note=None):
-    paragraphe, _, score = _trouver(document, cible)
-    if paragraphe is None:
-        return None, score
-    debut, fin = _bornes(_position_reelle(_texte(paragraphe), cible), _texte(paragraphe))
-    runs = _isoler(paragraphe, debut, fin)
-    if not runs:
-        return None, score
-    enveloppe = _baliser(runs, "del")
-    nouveau = paragraphe.add_run(" " + texte.strip())
-    nouveau.italic = True
-    nouveau.font.color.rgb = COULEUR_AJOUT
-    (runs[-1]._r if enveloppe is None else enveloppe).addnext(nouveau._r)
-    _baliser([nouveau], "ins")
-    if note:
-        _commenter(document, [nouveau], note)
-    return nouveau, score
+def _a_la_fin(document, paragraphe):
+    """Place le paragraphe à la fin du corps, avant les propriétés de la dernière section."""
+    corps = document.element.body
+    section = corps.find(qn("w:sectPr"))
+    if section is not None:
+        section.addprevious(paragraphe._p)
+    else:
+        corps.append(paragraphe._p)
 
 
-def _supprimer(document, cible, note=None):
-    paragraphe, _, score = _trouver(document, cible)
-    if paragraphe is None:
-        return None, score
-    debut, fin = _bornes(_position_reelle(_texte(paragraphe), cible), _texte(paragraphe))
-    runs = _isoler(paragraphe, debut, fin)
-    if not runs:
-        return None, score
-    _baliser(runs, "del")
-    if note:
-        _commenter(document, runs, note)
-    return runs, score
+def _annexe(document, questions, consequences, rapporter, modele=None):
+    """Annexe : questions à trancher, conséquences sourcées, et ce qui n'a pas été appliqué.
 
-
-def _bornes(position, texte):
-    """Recadre une position sur la longueur réelle du paragraphe."""
-    debut, fin = position
-    return max(0, min(debut, len(texte))), max(0, min(fin, len(texte)))
-
-
-def _annexe(document, questions, consequences, rapporter):
-    """Annexe : questions à trancher, conséquences sourcées, et ce qui n'a pas été appliqué."""
+    Écrite en rouge, dans la mise en forme du paragraphe courant du modèle.
+    """
     corps = []
     for question in questions or []:
         corps.append(f"• {question}")
@@ -362,16 +447,16 @@ def _annexe(document, questions, consequences, rapporter):
     for introuvable in rapporter.get("introuvables", []):
         corps.append(f"• [Non appliqué] {introuvable.get('type')}: « {introuvable.get('ancre') or ''} »")
 
-    titre = document.add_paragraph()
-    run_titre = titre.add_run("Annexe — points à trancher avant la signature (assisté)")
+    run_modele = _run_modele(modele) if modele is not None else None
+    titre = _paragraphe_comme(document, modele)
+    _a_la_fin(document, titre)
+    run_titre = _ecrire(titre, "Annexe — points à trancher avant la signature (assisté)", run_modele)
     run_titre.bold = True
     _baliser([run_titre], "ins")
     for ligne in corps or ["• Aucune question à trancher pour l'instant."]:
-        paragraphe = document.add_paragraph()
-        run = paragraphe.add_run(ligne)
-        run.font.color.rgb = COULEUR_AJOUT
-        _baliser([run], "ins")
-        titre = paragraphe
+        paragraphe = _paragraphe_comme(document, modele)
+        _a_la_fin(document, paragraphe)
+        _baliser([_ecrire(paragraphe, ligne, run_modele)], "ins")
 
 
 def _operations(plan):
@@ -401,6 +486,7 @@ def appliquer_plan(document, plan):
     modèle n'est ni supprimé ni reformulé.
     """
     rapport = {"appliquees": [], "introuvables": [], "compteurs": {}}
+    modele = reference(document)
     for operation in _operations(plan):
         genre = str(operation.get("type", "")).lower()
         ancre = operation.get("ancre") or operation.get("apres") or operation.get("cible") or ""
@@ -417,14 +503,14 @@ def appliquer_plan(document, plan):
                                                    signaler=True)
         elif genre == "ajout":
             detail["score"] = 1.0
-            resultat = _inserer(document, ancre, operation.get("texte", ""), detail["note"])
-        elif genre == "remplacement":
-            detail["score"] = 1.0
-            resultat, detail["score"] = _remplacer(document, ancre, operation.get("texte", ""),
-                                                   detail["note"])
-        elif genre == "suppression":
-            detail["score"] = 1.0
-            resultat, detail["score"] = _supprimer(document, ancre, detail["note"])
+            resultat = _inserer(document, ancre, operation.get("texte", ""), detail["note"], modele)
+        elif genre in ("remplacement", "suppression"):
+            # Le texte du modèle n'est jamais modifié : la proposition devient une note.
+            proposition = operation.get("texte", "").strip()
+            suite = f" Proposition : {proposition}" if genre == "remplacement" and proposition else (
+                " Suppression proposée." if genre == "suppression" else "")
+            detail["note"] = (detail["note"] + suite).strip()
+            resultat, detail["score"] = _surligner(document, ancre, detail["note"], "rose")
         else:
             detail["type"] = genre or "inconnue"
             rapport["introuvables"].append(detail)
@@ -436,7 +522,7 @@ def appliquer_plan(document, plan):
             rapport["introuvables"].append(detail)
 
     _annexe(document, (plan or {}).get("questions_au_client"),
-            (plan or {}).get("consequences_a_rappeler") or [], rapport)
+            (plan or {}).get("consequences_a_rappeler") or [], rapport, modele)
     rapport["compteurs"] = {
         "appliquees": len(rapport["appliquees"]),
         "introuvables": len(rapport["introuvables"]),
@@ -444,16 +530,6 @@ def appliquer_plan(document, plan):
     }
     rapport["resume_modifications"] = (plan or {}).get("resume_modifications", "")
     return rapport
-
-
-def _pieces_du_modele(chemin):
-    """Le PDF du modèle s'il existe : c'est là que sont les notes des auteurs."""
-    racine = chemin.stem.split("_not")[0]
-    for candidat in sorted(chemin.parent.glob("*.pdf")):
-        if candidat.stem.startswith(racine):
-            return [candidat]
-    pdf = chemin.with_suffix(".pdf")
-    return [pdf] if pdf.exists() else []
 
 
 def _consequences_en_texte(consequences):
@@ -494,8 +570,12 @@ def _contradictions_en_texte(contradictions):
 
 def _planifier(synthese, demandes_clients, commentaires, elements_factuels,
                contradictions, consequences, commentaires_consequences,
-               droit_applicable, chemin, model=None):
-    """Demande à Augure le plan de complétion du modèle, selon le prompt de l'étape 8."""
+               droit_applicable, texte_modele, model=None):
+    """Demande à Augure le plan de complétion du modèle, selon le prompt de l'étape 8.
+
+    Augure reçoit le texte du modèle Word sans ses pages liminaires : ses ancres
+    sont des citations exactes du document qui sera complété.
+    """
     corps = [PROMPT_ACTE.strip(),
              corps_demande(synthese, elements_factuels, demandes_clients, commentaires,
                            droit_applicable),
@@ -506,11 +586,8 @@ def _planifier(synthese, demandes_clients, commentaires, elements_factuels,
                      + "\n".join(f"- {c}" for c in commentaires_consequences))
     demande = "\n\n".join(section for section in corps if section)
 
-    pieces = _pieces_du_modele(chemin)
-    if not pieces:
-        demande += "\n\nTEXTE DU MODÈLE D'ACTE\n" + texte_document(chemin)[:80000]
-    plan = ask_augure(demande, fichiers=pieces, sortie_json=True,
-                      consignes=SCHEMA_PLAN.strip(), model=model)
+    demande += "\n\nTEXTE DU MODÈLE D'ACTE\n" + texte_modele[:200000]
+    plan = ask_augure(demande, sortie_json=True, consignes=SCHEMA_PLAN.strip(), model=model)
     if not isinstance(plan, dict):
         plan = {"reponse_brute": plan}
     plan.setdefault("ajouts", [])
@@ -526,19 +603,22 @@ def create_acte_modifie(synthese, demandes_clients, commentaires, elements_factu
                         sortie=None, model=None, plan=None):
     """Complète le modèle d'acte pour ce dossier. Renvoie le chemin du fichier Word.
 
-    Tout ce qui est ajouté est en rouge et en révision suivie ; les passages touchés
-    par une contradiction ou une conséquence sont surlignés, avec une note à côté ;
-    les clauses du modèle qui ne s'appliquent pas sont signalées, jamais retirées.
+    Les pages liminaires du modèle (``PAGES_LIMINAIRES``) ne sont ni lues ni
+    reprises. Le texte du modèle n'est jamais modifié : tout ce qui est ajouté est en
+    rouge, en révision suivie, dans la police et la taille du modèle ; les passages
+    touchés par une contradiction ou une conséquence sont surlignés, avec une note à
+    côté ; les clauses qui ne s'appliquent pas sont signalées, jamais retirées.
     Un rapport des modifications est écrit à côté, en ``.rapport.json``.
 
     ``plan`` : rejouer un plan déjà calculé au lieu d'en demander un nouveau.
     """
     chemin_source = db.get_acte_source(dossier, acte_id)
     document = Document(str(chemin_source))
+    retirer_pages_liminaires(document)
     if plan is None:
         plan = _planifier(synthese, demandes_clients, commentaires, elements_factuels,
                           contradictions, consequences, commentaires_consequences,
-                          droit_applicable, chemin_source, model)
+                          droit_applicable, _texte_du_document(document), model)
 
     rapport = appliquer_plan(document, plan)
     rapport.update({
@@ -558,9 +638,12 @@ def create_acte_modifie(synthese, demandes_clients, commentaires, elements_factu
     return str(chemin)
 
 
-def texte_document(chemin):
-    """Texte d'un Word, pour comparer au plan ou l'afficher."""
-    document = Document(str(chemin))
+def _texte_du_document(document):
     morceaux = [texte for paragraphe, _ in _paragraphes(document)
                if (texte := _texte(paragraphe)).strip()]
     return "\n".join(morceaux)
+
+
+def texte_document(chemin):
+    """Texte d'un Word, pour comparer au plan ou l'afficher."""
+    return _texte_du_document(Document(str(chemin)))

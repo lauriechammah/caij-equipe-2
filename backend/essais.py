@@ -13,9 +13,12 @@ import zipfile
 from pathlib import Path
 
 from docx import Document
+from docx.enum.text import WD_BREAK
+from docx.oxml.ns import qn
+from docx.shared import Pt
 
 from backend import db
-from backend.acte import appliquer_plan, create_acte_modifie, texte_document
+from backend.acte import appliquer_plan, create_acte_modifie, retirer_pages_liminaires, texte_document
 from backend.analyse import _normaliser_contradictions, get_contradictions, get_type_consequences
 from backend.llm import extraire_json
 
@@ -130,6 +133,34 @@ def essai_word():
     verifier("https://canlii.example/3115" in texte, "l'annexe cite l'url de la source")
 
 
+def essai_pages_liminaires():
+    print("\npages liminaires et mise en forme du modèle")
+    document = Document()
+    for page in range(1, 5):
+        document.add_paragraph(f"Page {page}")
+        if page < 4:
+            document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
+    retirer_pages_liminaires(document)
+    texte = [p.text for p in document.paragraphs if p.text]
+    verifier(texte == ["Page 4"], f"les 3 premières pages sont retirées : {texte}")
+
+    document = Document()
+    for _ in range(3):
+        run = document.add_paragraph().add_run("Le mandataire agit dans l'intérêt de la mandante.")
+        run.font.name, run.font.size = "Arial", Pt(10)
+    appliquer_plan(document, {"ajouts": [{"apres": "Le mandataire agit dans l'intérêt de la mandante.",
+                                          "texte": "Clause ajoutée.", "note": "Origine."}]})
+    ajout = next(r for p in document.paragraphs for r in p._p.iter(qn("w:r"))
+                 if "Clause ajoutée." in "".join(t.text or "" for t in r.iter(qn("w:t"))))
+    rpr = ajout.find(qn("w:rPr"))
+    police = rpr.find(qn("w:rFonts")).get(qn("w:ascii")) if rpr.find(qn("w:rFonts")) is not None else None
+    taille = rpr.find(qn("w:sz")).get(qn("w:val")) if rpr.find(qn("w:sz")) is not None else None
+    verifier((police, taille) == ("Arial", "20"), f"l'ajout reprend la police et la taille : {police} {taille}")
+    texte = [p.text for p in document.paragraphs]
+    verifier(texte.count("Le mandataire agit dans l'intérêt de la mandante.") == 3,
+             "le texte du modèle est intact")
+
+
 def essai_analyse():
     print("\nassemblage des méthodes")
     rapport = _normaliser_contradictions({"contradictions": [{"demandes_concernees": ["deux prénoms"],
@@ -200,7 +231,8 @@ def main():
     # Une base jetable : les actes de démonstration n'encombrent pas data/documents.db.
     with tempfile.TemporaryDirectory() as temporaire:
         db.BASE, db.CACHE = Path(temporaire) / "essais.db", Path(temporaire) / "cache"
-        for essai in (essai_json, essai_document, essai_word, essai_analyse, essai_acte_reel):
+        for essai in (essai_json, essai_document, essai_word, essai_pages_liminaires, essai_analyse,
+                      essai_acte_reel):
             essai()
     print(f"\n{_reussites} vérifications réussies, {_echecs} échecs")
     return 1 if _echecs else 0
