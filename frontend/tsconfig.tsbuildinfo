@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/api/augure.ts","./src/components/base.tsx","./src/components/espace.tsx","./src/components/icon.tsx","./src/components/panneauaugure.tsx","./src/data/mandat.ts","./src/screens/accueil.tsx","./src/screens/editeur.tsx","./src/screens/pipeline.tsx","./vite.config.ts"],"version":"5.8.3"}
