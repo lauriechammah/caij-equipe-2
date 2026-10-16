@@ -56,4 +56,10 @@
   --ombre-carte: 0 1px 1px rgba(15, 36, 64, 0.05);
   --ombre-page: 0 2px 10px rgba(15, 36, 64, 0.08);
   --ombre-dialogue: 0 12px 40px rgba(10, 23, 46, 0.25);
+
+  /* Animations */
+  --courbe-entree: cubic-bezier(0.22, 1, 0.36, 1);
+  --courbe-sortie: cubic-bezier(0.55, 0, 1, 0.45);
+  --duree-ecran: 420ms;
+  --duree-etape: 360ms;
 }

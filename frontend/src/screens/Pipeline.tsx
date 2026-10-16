@@ -422,6 +422,8 @@ export function Pipeline({ onQuitter, onTerminer }: { onQuitter: () => void; onT
   const [faits, setFaits] = useState(FAITS);
   const [demandes, setDemandes] = useState(DEMANDES);
   const [consequences, setConsequences] = useState(CONSEQUENCES);
+  // Sens du dernier changement d'étape ; nul à l'arrivée, pour ne pas animer en plus de la transition d'écran.
+  const [sens, setSens] = useState<"avant" | "arriere" | null>(null);
   const [contradictions, setContradictions] = useState(CONTRADICTIONS);
   const [contradictionsBrutes, setContradictionsBrutes] = useState<unknown[]>([]);
   const [risques, setRisques] = useState(SYNTHESE_RISQUES);
@@ -439,6 +441,7 @@ export function Pipeline({ onQuitter, onTerminer }: { onQuitter: () => void; onT
   const bloque = [1, 3, 5, 7].includes(actif) && Object.values(appels).some((a) => a.enCours);
 
   function aller(n: number) {
+    setSens(n < actif ? "arriere" : "avant");
     setActif(n);
     setAtteinte((a) => Math.max(a, n));
     contenu.current?.scrollTo({ top: 0 });
@@ -528,7 +531,11 @@ export function Pipeline({ onQuitter, onTerminer }: { onQuitter: () => void; onT
         <section className="milieu">
           <Stepper actif={actif} atteinte={atteinte} onAller={aller} />
 
-          <div className="milieu__contenu" ref={contenu}>
+          <div
+            key={actif}
+            className={`milieu__contenu ${sens ? `milieu__contenu--${sens}` : ""}`}
+            ref={contenu}
+          >
             <h2 className="milieu__titre">{etape.titre}</h2>
 
             {actif === 1 && (

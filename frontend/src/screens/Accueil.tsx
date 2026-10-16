@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { PhaseOuverture } from "../App";
 import { Logo, Pastille, BoutonRetour, BoutonSuivant, Badge, BoutonPrincipal } from "../components/Base";
 import { Icon } from "../components/Icon";
 import { CHEMIN_DOSSIER, MANDATS, PIECES, TYPES_ACTE, type Mandat } from "../data/mandat";
@@ -88,7 +89,15 @@ function DialogueNouveauMandat({ onFermer, onDemarrer }: { onFermer: () => void;
   );
 }
 
-export function Accueil({ onDemarrer, onOuvrir }: { onDemarrer: () => void; onOuvrir: (m: Mandat) => void }) {
+export function Accueil({
+  ouverture,
+  onDemarrer,
+  onOuvrir,
+}: {
+  ouverture: PhaseOuverture;
+  onDemarrer: () => void;
+  onOuvrir: (m: Mandat) => void;
+}) {
   const [filtre, setFiltre] = useState<Filtre>("Tous");
   const [recherche, setRecherche] = useState("");
   const [dialogue, setDialogue] = useState(false);
@@ -102,8 +111,18 @@ export function Accueil({ onDemarrer, onOuvrir }: { onDemarrer: () => void; onOu
     );
   }, [filtre, recherche]);
 
+  // Pendant l'ouverture, le logo de la barre est masqué (le logo en gros plan vient s'y poser),
+  // puis le contenu entre en cascade quand le fond de l'ouverture s'efface.
+  const classes = [
+    "accueil",
+    ouverture !== "finie" && "accueil--ouverture",
+    ouverture === "sortie" && "accueil--entree",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className="accueil">
+    <div className={classes} inert={ouverture === "logo"}>
       <header className="accueil__barre">
         <Logo />
       </header>
