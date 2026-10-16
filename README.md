@@ -73,17 +73,30 @@ claude mcp add --transport http augure https://mcp.augureai.ca/mcp \
 
 ## Compagnon (recherche CAIJ)
 
-`POST https://hackathon.caij.qc.ca/semantic-search` (réponse en SSE). [Swagger](https://hackathon.caij.qc.ca/docs)
+Aucune clé requise. [Swagger](https://hackathon.caij.qc.ca/docs)
 
-```json
-{
-  "query": "servitude de passage enclave article 997 C.c.Q.",
-  "search_types": ["legislation", "jurisprudence", "doctrine"],
-  "top_k": 10
-}
+```bash
+python scripts/compagnon.py "servitude de passage enclave"
+python scripts/compagnon.py --types legislation jurisprudence --top-k 5 "homologation mandat de protection"
+python scripts/compagnon.py --summary "durée maximale convention d'indivision"   # + résumé par le Compagnon (plus lent)
+python scripts/compagnon.py --json --out out/resultats.json "fiducie enfants mineurs testament"
 ```
 
-`search_types` accepte `topo`, `doctrine`, `legislation` et `jurisprudence`. **Une source inventée disqualifie** : toute citation doit venir du Compagnon.
+Ou directement avec curl :
+
+```bash
+curl -N -X POST https://hackathon.caij.qc.ca/semantic-search \
+  -H "Content-Type: application/json" \
+  -d '{"query": "servitude de passage enclave", "search_types": ["legislation"], "top_k": 5,
+       "semantic_analysis": false, "summarization": false}'
+```
+
+- La réponse arrive en **SSE** : des événements `status` (progression), puis un événement `done` dont le champ `data.message` est une **chaîne JSON** à décoder une deuxième fois.
+- Dans ce JSON, `results` contient un tableau par type (`legislation`, `jurisprudence`, `doctrine`, `topo`). Chaque document a `title`, `content` (l'extrait), `original_url` (le lien CAIJ à citer) et `score`. Les champs `textual_summary` et `follow_up_suggestions` sont remplis si `summarization` est à `true`.
+- Paramètres utiles : `search_types`, `top_k` (1 à 100), `clarifications`, `search_filters` (date, juridiction, tribunal).
+- Le Compagnon peut renvoyer plus de résultats que `top_k` et des types non demandés. Le script les filtre.
+
+**Une source inventée disqualifie** : toute citation doit venir du Compagnon, avec son `original_url`.
 
 ## Critères du jury
 
@@ -100,5 +113,6 @@ docs/
   Hackathon CAIJ — Les deux défis.pdf
 scripts/
   augure.py           client Augure : envoie dossier/modèle, renvoie la réponse
+  compagnon.py        client Compagnon : recherche dans les sources du CAIJ
 .env.example          variables d'environnement à copier dans .env
 ```
