@@ -74,14 +74,15 @@ def compagnon_search(query, types=("legislation",), top_k=10, clarifications=Non
 def augure_chat(prompt, system=None, model=None, effort="low", max_tokens=64000):
     """Envoie un prompt texte à Augure (streaming SSE) et renvoie la réponse complète.
 
-    Si le modèle épuise son budget en raisonnement sans répondre (reasoning_cutoff),
-    l'appel est refait une fois sans raisonnement. Si la connexion tombe pendant un
-    long raisonnement, il est refait une fois avec moins de raisonnement.
+    Si le modèle épuise son budget en raisonnement sans répondre (reasoning_cutoff)
+    ou dépasse le délai d'Augure (upstream_error), l'appel est refait une fois sans
+    raisonnement. Si la connexion tombe pendant un long raisonnement, il est refait
+    une fois avec moins de raisonnement.
     """
     try:
         return _augure_chat(prompt, system, model, effort, max_tokens)
     except AugureError as e:
-        if "reasoning_cutoff" not in str(e) or effort == "none":
+        if effort == "none" or not any(code in str(e) for code in ("reasoning_cutoff", "upstream_error")):
             raise
         return _augure_chat(prompt, system, model, "none", max_tokens)
     except (OSError, http.client.HTTPException) as e:

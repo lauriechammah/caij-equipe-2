@@ -145,8 +145,6 @@ def articles_pertinents(docs, syntdmd):
             ("Source officielle : articles trouvés par le Compagnon du CAIJ", extraits),
         ),
         FORMAT_ARTICLES,
-        # En « low », Augure renvoyait un tableau vide sans examiner les extraits.
-        effort="medium",
     )
 
 
