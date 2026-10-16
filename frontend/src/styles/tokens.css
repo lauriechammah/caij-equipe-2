@@ -1,0 +1,59 @@
+/* Variables du fichier Figma (noms d'origine entre parenthèses). */
+:root {
+  /* fond/* */
+  --fond-papier: #f5f8f9;
+  --fond-surface: #ffffff;
+  --fond-doux: #f7fafb;
+  --fond-filtres: #eaf1f3;
+  --fond-badge: #eef6f8;
+
+  /* bordure/* */
+  --bordure-defaut: #dde5e8;
+  --bordure-pointille: #7fcad7;
+  --bordure-champ: #bcd0d6;
+  --bordure-badge: #cde0e5;
+  --bordure-case: #8ba4ab;
+  --bordure-stepper: #c2d4d9;
+
+  /* texte/* */
+  --texte-principal: #16232a;
+  --texte-secondaire: #53676d;
+  --texte-accent: #0e4c56;
+  --texte-sur-accent: #ffffff;
+
+  /* accent/*, marque/* */
+  --accent-fond: #0e4c56;
+  --accent-vif: #00adc8;
+  --marque-teinte: #e2f4f7;
+
+  /* statut/* */
+  --statut-vert-fond: #e6f0ea;
+  --statut-vert-texte: #2e6b47;
+  --statut-ambre-fond: #fbf1df;
+  --statut-ambre-texte: #8a5a10;
+  --statut-ambre-bordure: #d9a441;
+  --statut-ambre-ligne: #fffbf3;
+
+  /* document/* */
+  --document-fond: #ffffff;
+  --document-bordure: #dde1e8;
+  --document-titre: #0e4c56;
+  --document-texte: #1b2230;
+  --document-secondaire: #5e6878;
+  --document-annotation: #8a5a10;
+  --document-note-fond: #fbf1df;
+  --document-note-bordure: #d9a441;
+
+  /* surlignage/* */
+  --surlignage-jaune: #fff0a6;
+  --surlignage-bordure: #e2c044;
+
+  --voile: #0f1e36;
+
+  --police-sans: "Source Sans 3", system-ui, sans-serif;
+  --police-serif: "Source Serif 4", Georgia, serif;
+
+  --ombre-carte: 0 1px 1px rgba(15, 36, 64, 0.05);
+  --ombre-page: 0 2px 10px rgba(15, 36, 64, 0.08);
+  --ombre-dialogue: 0 12px 40px rgba(10, 23, 46, 0.25);
+}
