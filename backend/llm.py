@@ -67,7 +67,7 @@ def _regler_clients(reglages=None):
     """Aligne les clients de ``scripts/`` sur la configuration, y compris après un .env créé tard."""
     reglages = reglages or valeurs()
     augure.BASE_URL = reglages["augure_base"]
-    compagnon.URL = reglages["compagnon_url"].rstrip("/") + "/semantic-search"
+    compagnon.URL = reglages["compagnon_url"]
     return reglages
 
 

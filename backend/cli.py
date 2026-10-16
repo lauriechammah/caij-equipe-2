@@ -1,9 +1,12 @@
 """Essayer le backend de bout en bout sur un dossier fictif.
 
+    python -m backend.cli acte --dossier mandat_protection --types nullité inaptitude
     python -m backend.cli contradictions --dossier mandat_protection
-    python -m backend.cli consequences --dossier mandat_protection --types "nullité" "invalidité" "tutelle"
-    python -m backend.cli acte --dossier mandat_protection --plan out/plan.json
+    python -m backend.cli consequences --dossier mandat_protection --types nullité inaptitude
     python -m backend.cli sources "homologation du mandat de protection"
+
+``acte`` enchaîne les trois étapes : droit applicable, contradictions, conséquences,
+puis l'acte. Les sorties intermédiaires sont dans ``out/demo/``.
 
 Le dossier n'est jamais lu ici : Augure lit les pièces et renvoie la synthèse,
 les demandes du client et les éléments factuels.
@@ -15,7 +18,7 @@ import sys
 from pathlib import Path
 
 from backend.acte import create_acte_modifie
-from backend.analyse import get_contradictions, get_type_consequences
+from backend.analyse import get_contradictions, get_type_consequences, resume_droit_applicable
 from backend.config import SORTIE
 from backend.llm import ErreurLLM, ask_augure, ask_compagnon
 
@@ -57,8 +60,10 @@ def main():
     consequences.add_argument("--dossier", required=True)
     consequences.add_argument("--types", nargs="+", required=True)
 
-    acte = sous.add_parser("acte", help="produire le projet d'acte Word")
+    acte = sous.add_parser("acte", help="enchaîner les trois étapes et produire l'acte Word")
     acte.add_argument("--dossier", required=True)
+    acte.add_argument("--types", nargs="+", default=[],
+                      help="liste des conséquences possibles")
     acte.add_argument("--plan", help="rejouer un plan JSON au lieu de le calculer")
 
     sources = sous.add_parser("sources", help="chercher dans les sources du CAIJ")
@@ -70,29 +75,37 @@ def main():
             _sortie("recherche", "sources", ask_compagnon(args.question))
             return
 
-        if args.plan:
+        if getattr(args, "plan", None):
             plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
             _sortie(args.dossier, "acte", create_acte_modifie(
                 "", [], [], [], [], dossier=args.dossier, plan=plan))
             return
 
         pieces = _pieces(args.dossier)
+        synthese = pieces.get("synthese", "")
+        demandes = pieces.get("demandes_clients", [])
+        commentaires = pieces.get("commentaires", [])
+        faits = pieces.get("elements_factuels", [])
+        droit = resume_droit_applicable(synthese, faits, demandes, getattr(args, "types", None))
+
         if args.commande == "contradictions":
-            rapport = get_contradictions(pieces.get("demandes_clients", []),
-                                         pieces.get("commentaires", []),
-                                         pieces.get("synthese", ""),
-                                         pieces.get("elements_factuels", []),
-                                         dossier=args.dossier)
-            _sortie(args.dossier, "contradictions", rapport)
+            _sortie(args.dossier, "contradictions", get_contradictions(
+                demandes, commentaires, synthese, faits, droit_applicable=droit,
+                dossier=args.dossier))
         elif args.commande == "consequences":
             _sortie(args.dossier, "consequences", get_type_consequences(
-                pieces.get("demandes_clients", []), pieces.get("commentaires", []),
-                args.types, pieces.get("synthese", ""), pieces.get("elements_factuels", [])))
+                demandes, commentaires, args.types, synthese, faits, droit_applicable=droit))
         else:
-            _sortie(args.dossier, "acte", create_acte_modifie(
-                pieces.get("synthese", ""), pieces.get("demandes_clients", []),
-                pieces.get("commentaires", []), pieces.get("elements_factuels", []),
-                [], [], dossier=args.dossier))
+            contradictions = json.loads(get_contradictions(
+                demandes, commentaires, synthese, faits, droit_applicable=droit,
+                dossier=args.dossier))
+            consequences = get_type_consequences(
+                demandes, commentaires, args.types, synthese, faits, droit_applicable=droit)
+            chemin = create_acte_modifie(
+                synthese, demandes, commentaires, faits, consequences,
+                contradictions=contradictions, droit_applicable=droit, dossier=args.dossier)
+            print(f"{len(contradictions['contradictions'])} contradictions, "
+                  f"{len(consequences)} conséquences, acte : {chemin}")
     except ErreurLLM as erreur:
         sys.exit(f"Erreur : {erreur}")
 

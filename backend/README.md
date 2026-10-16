@@ -6,7 +6,7 @@ Augure ou au Compagnon, on reçoit du JSON ; on donne un dossier, on reçoit l'a
 ```bash
 python -m venv .venv && .venv/bin/pip install -r backend/requirements.txt
 cp .env.example .env          # puis AUGURE_API_KEY
-.venv/bin/python -m backend.essais      # 29 vérifications, sans clé ni appel réseau
+.venv/bin/python -m backend.essais      # 41 vérifications, sans clé ni appel réseau
 ```
 
 ## Les deux appels, un prompt chacun
@@ -28,35 +28,49 @@ sources = ask_compagnon("homologation du mandat de protection")
 
 ## Les trois méthodes
 
+Les trois prompts sont dans `analyse.py` (`PROMPT_CONTRADICTIONS`, `PROMPT_CONSEQUENCES`)
+et `acte.py` (`PROMPT_ACTE`), repris tels quels ; la sortie attendue de chacune est dans le
+`SCHEMA_…` qui suit.
+
 ```python
 from backend import get_contradictions, get_type_consequences, create_acte_modifie
+from backend import resume_droit_applicable
 
-rapport = get_contradictions(demandes_clients, commentaires, synthese, elements_factuels)
+droit = resume_droit_applicable(synthese, elements_factuels)      # résumé + liste des articles
+rapport = get_contradictions(demandes_clients, commentaires, synthese,
+                            elements_factuels, droit_applicable=droit)
 consequences = get_type_consequences(
-    demandes_clients, commentaires, types_possibles, synthese, elements_factuels)
+    demandes_clients, commentaires, types_possibles, synthese, elements_factuels,
+    droit_applicable=droit)
 chemin = create_acte_modifie(
-    synthese, demandes_clients, commentaires, elements_factuels, consequences, commentaires)
+    synthese, demandes_clients, commentaires, elements_factuels, consequences,
+    contradictions=json.loads(rapport), droit_applicable=droit)
 ```
 
 | Méthode | Renvoie |
 | --- | --- |
-| `get_contradictions` | le rapport en JSON, **une chaîne** : `contradictions`, `information_manquante`, `questions_prioritaires`, `elements_a_verifier` |
-| `get_type_consequences` | la **liste** des conséquences retenues, chacune avec sa source et son url |
+| `get_contradictions` | le rapport en JSON, **une chaîne** : `contradictions` (demandes concernées, problème, articles, certitude), `questions_au_notaire` |
+| `get_type_consequences` | la **liste** des conséquences retenues : demandes déclencheuses, effets, faits, articles, certitude, `hors_liste`, et la source |
 | `create_acte_modifie` | le **chemin** du fichier Word produit |
 
-`get_type_consequences` interroge le Compagnon avant Augure : une conséquence sans passage
-dans les sources revient avec une url vide plutôt qu'avec une référence inventée.
+Le droit applicable se cherche une fois avec `resume_droit_applicable` et se passe aux trois
+étapes ; si on ne le fournit pas, chaque étape le cherche elle-même. Un article cité par le
+modèle est rapproché des passages du Compagnon : s'il ne s'y retrouve pas, la conséquence
+revient avec une url vide plutôt qu'avec une référence inventée.
 
 ## Le document produit
 
-`create_acte_modifie` fait proposer à Augure un plan (`annotation`, `ajout`, `remplacement`,
-`suppression`, chacun avec son ancre citation exacte du modèle), puis **le code** l'applique.
-Rien n'est jamais modifié en silence.
+`create_acte_modifie` fait proposer à Augure un plan — `ajouts`, `surlignages`, `signalees`,
+chacun avec une ancre citant le modèle mot pour mot — puis **le code** l'applique.
 
-- les **ajouts** sont des révisions suivies : Word les affiche comme des insertions, avec
-  l'auteur « Assistant CAIJ — équipe 2 » ; les suppressions et remplacements aussi ;
-- les passages à vérifier sont **surlignés** (jaune, vert, cyan, rose ou rouge) et portent un
-  **commentaire Word** ;
+Comme l'exige le prompt : le texte du modèle n'est jamais supprimé ni reformulé.
+
+- chaque **ajout** est **rouge** et en révision suivie : Word l'affiche comme une insertion,
+  avec l'auteur « Assistant CAIJ — équipe 2 » ;
+- un **[À COMPLÉTER : …]** reste en rouge quand une information manque, avec sa note ;
+- les passages touchés par une contradiction ou une conséquence sont **surlignés** (jaune,
+  vert, cyan, rose), portent un **commentaire Word** et une **note courte à côté** ;
+- une clause qui ne s'applique pas est **signalée** en rouge, jamais retirée ;
 - une **annexe** reprend les questions à trancher, les conséquences et leurs urls, et ce qui
   n'a pas pu être appliqué ;
 - à côté du `.docx`, un `.rapport.json` liste les opérations appliquées, les ancres introuvables
@@ -83,9 +97,9 @@ fonctions.
 ## Essayer de bout en bout
 
 ```bash
+.venv/bin/python -m backend.cli acte --dossier mandat_protection --types nullité inaptitude
 .venv/bin/python -m backend.cli contradictions --dossier mandat_protection
 .venv/bin/python -m backend.cli consequences --dossier mandat_protection --types nullité inaptitude
-.venv/bin/python -m backend.cli acte --dossier mandat_protection
 .venv/bin/python -m backend.cli sources "homologation du mandat de protection"
 ```
 

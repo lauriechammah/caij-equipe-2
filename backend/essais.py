@@ -9,6 +9,7 @@ l'assemblage des trois méthodes. Utile avant une démonstration.
 import json
 import sys
 import tempfile
+import zipfile
 from pathlib import Path
 
 from docx import Document
@@ -77,19 +78,19 @@ def essai_word():
     document.save(str(source))
 
     plan = {
-        "operations": [
-            {"type": "annotation", "ancre": "La mandante désigne le mandataire pour exercer ses "
-                                             "droits en son nom.",
-             "commentaire": "Deux versions de l'identité dans le dossier.", "couleur": "jaune"},
-            {"type": "ajout", "apres": "Le mandataire agit dans l'intérêt de la mandante.",
+        "surlignages": [
+            {"ancre": "La mandante désigne le mandataire pour exercer ses droits en son nom.",
+             "note": "Deux versions de l'identité dans le dossier.", "origine": "contradiction",
+             "couleur": "jaune"},
+            {"ancre": "phrase absente", "note": "Rien à faire."},
+        ],
+        "ajouts": [
+            {"apres": "Le mandataire agit dans l'intérêt de la mandante.",
              "texte": "Toute décision doit être approuvée par le tribunal.",
-             "commentaire": "Ajout imposé par l'état de santé décrit au dossier."},
-            {"type": "remplacement", "cible": "Fait à Québec, ce jour.",
-             "texte": "Fait à Québec, le [date de la signature].",
-             "commentaire": "La date n'est pas fixée."},
-            {"type": "suppression", "cible": "Le mandataire agit dans l'intérêt de la mandante.",
-             "commentaire": "Clause redondante."},
-            {"type": "annotation", "ancre": "phrase absente", "commentaire": "Rien à faire."},
+             "note": "Ajout imposé par l'état de santé décrit au dossier."},
+        ],
+        "signalees": [
+            {"clause": "Adresse du mandataire", "raison": "Le domicile n'est pas établi."},
         ],
         "questions_au_client": ["Quelle est la date de la signature ?"],
         "consequences_a_rappeler": [{"type": "nullité", "consequence": "Mandat nul si inaptitude.",
@@ -100,18 +101,26 @@ def essai_word():
     sortie = source.with_name("acte.docx")
     modifie.save(str(sortie))
 
-    verifier(rapport["compteurs"] == {"appliquees": 4, "introuvables": 1, "questions": 1},
+    verifier(rapport["compteurs"] == {"appliquees": 3, "introuvables": 1, "questions": 1},
              f"compteurs {rapport['compteurs']}")
     verifier(rapport["introuvables"][0]["type"] == "annotation", "l'ancre absente est signalée")
+    verifier(any(o["type"] == "signalement" for o in rapport["appliquees"]),
+             "la clause non applicable est signalée, pas supprimée")
 
     relu = Document(str(sortie))
-    verifier(len(relu.comments) == 4, f"commentaires Word : {len(relu.comments)}")
+    verifier(len(relu.comments) == 3, f"commentaires Word : {len(relu.comments)}")
     texte = texte_document(sortie)
-    verifier("[Ajouté] Toute décision doit être approuvée par le tribunal." in texte,
+    verifier("Toute décision doit être approuvée par le tribunal." in texte,
              "la clause ajoutée est dans le texte")
-    verifier("le [date de la signature]" in texte, "la formulation de remplacement est présente")
-    verifier("Fait à Québec, ce jour." in texte, "le texte supprimé reste visible comme révision")
+    verifier("[Note : " in texte, "la note est posée à côté du passage")
+    verifier("Fait à Québec, ce jour." in texte, "le texte du modèle n'a pas été modifié")
     verifier("Adresse du mandataire" in texte, "les cellules de tableau sont lues")
+    conservees = ["MANDAT DE PROTECTION", "La mandante désigne le mandataire",
+                  "Le mandataire agit dans l'intérêt de la mandante.", "Fait à Québec, ce jour."]
+    verifier(all(c in texte for c in conservees), "aucune clause du modèle n'a disparu")
+    xml = zipfile.ZipFile(str(sortie)).read("word/document.xml").decode("utf-8")
+    verifier('w:color w:val="C00000"' in xml, "les ajouts sont en rouge")
+    verifier("w:highlight" in xml, "les passages sont surlignés")
     verifier(texte_document(sortie).startswith("MANDAT DE PROTECTION"), "relecture du texte")
     verifier(texte_document(sortie).index("Adresse du mandataire")
              < texte_document(sortie).index("Fait à Québec"),
@@ -123,8 +132,9 @@ def essai_word():
 
 def essai_analyse():
     print("\nassemblage des méthodes")
-    rapport = _normaliser_contradictions({"contradictions": [{"enonce": "deux prénoms"}],
-                                          "information_manquante": [{"manque": "date"}]})
+    rapport = _normaliser_contradictions({"contradictions": [{"demandes_concernees": ["deux prénoms"],
+                                                               "probleme": "deux versions"}],
+                                          "questions_au_notaire": ["Quel prénom ?"]})
     verifier(rapport["contradictions"][0]["id"] == "C1", "les contradictions sont numérotées")
     verifier(_normaliser_contradictions([])["aucune_contradiction"] is True,
              "un rapport vide est traité")
@@ -137,9 +147,10 @@ def essai_analyse():
         if "consequences" in options.get("consignes", ""):
             return {"consequences": [{"type": "nullité",
                                       "consequence": "Mandat nul si inaptitude."}]}
-        return {"contradictions": [{"enonce": "deux versions du nom"}],
-                "questions_prioritaires": ["Quel est le bon nom ?"],
-                "information_manquante": []}
+        return {"contradictions": [{"demandes_concernees": ["deux versions du nom"],
+                                     "probleme": "deux versions", "articles": ["CCQ-3115"],
+                                     "certitude": "certaine"}],
+                "questions_au_notaire": ["Quel est le bon nom ?"]}
 
     def faux_compagnon(prompt, **options):
         return {"nb_sources": 1, "resume": "", "sources": [
@@ -159,7 +170,8 @@ def essai_analyse():
 
         consequences = get_type_consequences([{"demande": "protéger ma mère"}], [],
                                              ["nullité", "inaptitude"], "Synthèse.",
-                                             ["La mandante est apte"])
+                                             ["La mandante est apte"],
+                                             droit_applicable=faux_compagnon("droit"))
         verifier(isinstance(consequences, list) and consequences[0]["id"] == "K1",
                  "get_type_consequences rend une liste")
         verifier(consequences[0]["source"] == {"titre": "", "url": "", "extrait": ""},
@@ -176,7 +188,7 @@ def essai_acte_reel():
         chemin = Path(create_acte_modifie(
             "Synthèse de démonstration.", [{"demande": "test"}], [], [{"fait": "élément"}], [],
             [], dossier=dossier,
-            plan={"operations": [{"type": "annotation", "ancre": "mandataire", "commentaire": "À vérifier."}],
+            plan={"surlignages": [{"ancre": "mandataire", "note": "À vérifier."}],
                   "questions_au_client": ["Question de démonstration ?"]}))
         rapport = json.loads(chemin.with_suffix(".rapport.json").read_text(encoding="utf-8"))
         verifier(chemin.exists(), f"{dossier} : {chemin.name} écrit")

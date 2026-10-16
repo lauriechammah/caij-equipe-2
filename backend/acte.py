@@ -36,11 +36,13 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 
 from backend import db
+from backend.analyse import corps_demande
 from backend.llm import ask_augure
 
 AUTEUR = "Assistant CAIJ — équipe 2"
 INITIALES = "CAIJ"
-COULEUR_AJOUT = RGBColor(0x1F, 0x4E, 0x79)
+LONGUEUR_NOTE = 220
+COULEUR_AJOUT = RGBColor(0xC0, 0x00, 0x00)
 COULEURS = {
     "jaune": WD_COLOR_INDEX.YELLOW,
     "vert": WD_COLOR_INDEX.BRIGHT_GREEN,
@@ -51,33 +53,46 @@ COULEURS = {
 SEUIL_SIMILARITE = 0.82
 _dernier_id = [1000]
 
-SCHEMA_PLAN = """
-Réponds par un objet JSON exact, sans texte autour :
-{
-  "operations": [
-    {"type": "annotation", "ancre": "phrase exacte du modèle à surligner, 10 mots ou plus",
-     "commentaire": "ce qu'il faut vérifier, et d'où vient le doute", "couleur": "jaune"},
-    {"type": "ajout", "apres": "phrase exacte du modèle après laquelle insérer",
-     "texte": "la clause à ajouter, rédigée comme dans un acte", "commentaire": "d'où vient cette clause"},
-    {"type": "remplacement", "cible": "phrase exacte du modèle à remplacer",
-     "texte": "la formulation corrigée", "commentaire": "ce qui ne va pas dans l'original"},
-    {"type": "suppression", "cible": "phrase exacte du modèle à retirer",
-     "commentaire": "pourquoi cette clause ne doit pas rester"}
-  ],
-  "questions_au_client": ["les questions à poser avant de signer, dans l'ordre"],
-  "resume_modifications": "en trois phrases, ce que tu as changé et pourquoi"
-}
-Règles : les ancres sont des citations exactes du modèle, jamais des reformulations ;
-une opération par point à corriger, sans doublon ; n'ajoute au texte que ce que le dossier
-justifie, et laisse les emplacements non documentés entre crochets [À CONFIRMER] ;
-n'écris jamais de clause qui engage le client sans fait dans le dossier.
-"""
-
 
 def _prochain_id():
     """Identifiant unique de révision suivie, exigé par Word."""
     _dernier_id[0] += 1
     return _dernier_id[0]
+
+
+PROMPT_ACTE = """
+Complète le modèle d'acte pour ce dossier à partir de toute la documentation fournie : la liste des faits, le résumé et la liste des articles du droit applicable, la liste exhaustive des demandes, les contradictions et les conséquences.
+Remplis chaque section du modèle avec les informations exactes tirées des faits et des demandes. Ajoute les clauses nécessaires pour couvrir toutes les demandes du client, en respectant le droit applicable et le style du modèle. Ne modifie pas le texte existant du modèle, sauf pour le compléter. Si une clause du modèle ne semble pas s'appliquer au dossier, ne la supprime pas : signale-la.
+Mets en rouge tout le texte que tu ajoutes au modèle. Surligne les passages touchés par une contradiction ou une conséquence relevée aux étapes précédentes, et ajoute à côté une courte note qui explique le problème.
+N'invente aucune information. Si un renseignement nécessaire est absent ou incertain, laisse un espace à compléter, mets-le en rouge et ajoute une note. Ne règle pas les contradictions toi-même : présente-les au notaire.
+"""
+
+SCHEMA_PLAN = """
+Réponds par un objet JSON exact, sans texte autour, sans commentaire :
+{
+  "ajouts": [
+    {"apres": "phrase exacte du modèle après laquelle insérer, 10 mots ou plus",
+     "texte": "la clause rédigée dans le style du modèle. Si une information manque, écris [À COMPLÉTER : ce qu'il manque] à sa place, jamais une invention.",
+     "note": "d'où vient la clause, ou ce qu'il faut confirmer"}
+  ],
+  "surlignages": [
+    {"ancre": "phrase exacte du modèle touchée par une contradiction ou une conséquence",
+     "note": "courte note expliquant le problème, en une phrase",
+     "origine": "contradiction | consequence", "couleur": "jaune"}
+  ],
+  "signalees": [
+    {"clause": "citation exacte de la clause du modèle qui ne s'applique pas au dossier",
+     "raison": "pourquoi elle ne s'applique pas"}
+  ],
+  "questions_au_client": ["les questions à poser avant de signer, dans l'ordre"],
+  "resume_modifications": "en trois phrases, ce que tu as complété et pourquoi"
+}
+Règles : n'utilise que les faits, les demandes, le droit applicable, les contradictions et les
+conséquences fournis ; les ancres sont des citations exactes du modèle, jamais des reformulations ;
+une opération par point à corriger, sans doublon ; aucune suppression, aucune reformulation du
+texte du modèle. "signalees" sert pour les clauses qui ne s'appliquent pas : on les signale,
+on ne les retire pas.
+"""
 
 
 def _normaliser(texte):
@@ -220,23 +235,45 @@ def _baliser(runs, element):
     return enveloppe
 
 
-def _inserer(document, apres, texte, commentaire=None):
-    """Ajoute une clause après le paragraphe ``apres``, en révision suivie."""
+def _inserer(document, apres, texte, note=None):
+    """Ajoute une clause après le paragraphe ``apres``, en rouge et en révision suivie."""
     ancre, _, _ = _trouver(document, apres)
     if ancre is None:
         return None
     paragraphe = document.add_paragraph()
     ancre._p.addnext(paragraphe._p)
-    run = paragraphe.add_run("[Ajouté] " + texte.strip())
-    run.italic = True
+    run = paragraphe.add_run(texte.strip())
     run.font.color.rgb = COULEUR_AJOUT
     _baliser([run], "ins")
-    if commentaire:
-        document.add_comment(runs=[run], text=str(commentaire), author=AUTEUR, initials=INITIALES)
+    if note:
+        _commenter(document, [run], note)
+        _note_en_marge(paragraphe, run, note)
     return paragraphe
 
 
-def _surligner(document, ancre, commentaire, couleur="jaune"):
+def _note_en_marge(paragraphe, apres, note):
+    """La courte note demandée à côté du passage, dans la couleur des ajouts."""
+    texte = " ".join(str(note).split())
+    if len(texte) > LONGUEUR_NOTE:
+        texte = texte[:LONGUEUR_NOTE - 1].rstrip() + "…"
+    if not texte:
+        return None
+    run = paragraphe.add_run("  [Note : " + texte + "]")
+    run.italic = True
+    run.font.color.rgb = COULEUR_AJOUT
+    return run
+
+
+def _commenter(document, runs, texte, suffixe=""):
+    """Commentaire Word, ou simple note en rouge quand il n'y a pas de passage à ancrer."""
+    if not runs or not texte:
+        return None
+    return document.add_comment(runs=runs, text=str(texte) + suffixe, author=AUTEUR,
+                               initials=INITIALES)
+
+
+def _surligner(document, ancre, note=None, couleur="jaune", signaler=False):
+    """Surligne le passage et pose la note à côté. Rien n'est retiré du modèle."""
     paragraphe, _, score = _trouver(document, ancre)
     if paragraphe is None:
         return None, score
@@ -246,12 +283,15 @@ def _surligner(document, ancre, commentaire, couleur="jaune"):
     else:
         debut, fin = 0, len(texte)
     runs = _isoler(paragraphe, debut, fin)
-    teinte = COULEURS.get(str(couleur).lower(), WD_COLOR_INDEX.YELLOW)
+    if not runs:
+        return None, score
+    teinte = COULEURS.get("rouge" if signaler else str(couleur).lower(), WD_COLOR_INDEX.YELLOW)
     for run in runs:
         run.font.highlight_color = teinte
-    if commentaire and runs:
-        document.add_comment(runs=runs, text=str(commentaire), author=AUTEUR, initials=INITIALES)
-    return runs or None, score
+    if note:
+        _commenter(document, runs, note, " — clause qui ne s'applique pas au dossier" if signaler else "")
+        _note_en_marge(paragraphe, runs[-1], ("Ne s'applique pas : " if signaler else "") + note)
+    return runs, score
 
 
 def _position_reelle(texte, ancre):
@@ -266,7 +306,7 @@ def _position_reelle(texte, ancre):
     return debut, debut + len(normalise)
 
 
-def _remplacer(document, cible, texte, commentaire=None):
+def _remplacer(document, cible, texte, note=None):
     paragraphe, _, score = _trouver(document, cible)
     if paragraphe is None:
         return None, score
@@ -280,12 +320,12 @@ def _remplacer(document, cible, texte, commentaire=None):
     nouveau.font.color.rgb = COULEUR_AJOUT
     (runs[-1]._r if enveloppe is None else enveloppe).addnext(nouveau._r)
     _baliser([nouveau], "ins")
-    if commentaire:
-        document.add_comment(runs=[nouveau], text=str(commentaire), author=AUTEUR, initials=INITIALES)
+    if note:
+        _commenter(document, [nouveau], note)
     return nouveau, score
 
 
-def _supprimer(document, cible, commentaire=None):
+def _supprimer(document, cible, note=None):
     paragraphe, _, score = _trouver(document, cible)
     if paragraphe is None:
         return None, score
@@ -294,8 +334,8 @@ def _supprimer(document, cible, commentaire=None):
     if not runs:
         return None, score
     _baliser(runs, "del")
-    if commentaire:
-        document.add_comment(runs=runs, text=str(commentaire), author=AUTEUR, initials=INITIALES)
+    if note:
+        _commenter(document, runs, note)
     return runs, score
 
 
@@ -334,37 +374,60 @@ def _annexe(document, questions, consequences, rapporter):
         titre = paragraphe
 
 
+def _operations(plan):
+    """Les opérations du plan, quelle que soit sa forme.
+
+    Le plan produit par Augure a trois clés (``ajouts``, ``surlignages``, ``signalees``) ;
+    un plan écrit à la main peut aussi donner une liste ``operations`` d'objets
+    ``{"type": …}``, les deux formes sont acceptées.
+    """
+    plan = plan or {}
+    operations = []
+    for surlignage in plan.get("surlignages") or []:
+        operations.append({"type": "annotation", **surlignage})
+    for signalee in plan.get("signalees") or []:
+        operations.append({"type": "signalement", **signalee})
+    for ajout in plan.get("ajouts") or []:
+        operations.append({"type": "ajout", **ajout})
+    for operation in plan.get("operations") or []:
+        operations.append({"type": str(operation.get("type", "")).lower(), **operation})
+    return operations
+
+
 def appliquer_plan(document, plan):
-    """Applique un plan de modifications à un document ouvert. Retourne un rapport."""
-    operations = (plan or {}).get("operations") or []
+    """Applique un plan de modifications à un document ouvert. Retourne un rapport.
+
+    Le modèle ne propose que d'annoter, de compléter et de signaler : le texte du
+    modèle n'est ni supprimé ni reformulé.
+    """
     rapport = {"appliquees": [], "introuvables": [], "compteurs": {}}
-    for operation in operations:
+    for operation in _operations(plan):
         genre = str(operation.get("type", "")).lower()
+        ancre = operation.get("ancre") or operation.get("apres") or operation.get("cible") or ""
+        detail = {"type": genre, "ancre": ancre,
+                  "note": operation.get("note") or operation.get("raison") or "",
+                  "origine": operation.get("origine", "")}
+
         if genre == "annotation":
-            resultat, score = _surligner(document, operation.get("ancre", ""),
-                                         operation.get("commentaire", ""),
-                                         operation.get("couleur", "jaune"))
-            detail = {"type": "annotation", "ancre": operation.get("ancre", ""),
-                      "commentaire": operation.get("commentaire", ""), "score": score}
+            resultat, detail["score"] = _surligner(document, ancre, detail["note"],
+                                                   operation.get("couleur", "jaune"))
+        elif genre == "signalement":
+            detail["ancre"] = operation.get("clause") or ancre
+            resultat, detail["score"] = _surligner(document, detail["ancre"], detail["note"],
+                                                   signaler=True)
         elif genre == "ajout":
-            resultat = _inserer(document, operation.get("apres", ""), operation.get("texte", ""),
-                                operation.get("commentaire"))
-            detail = {"type": "ajout", "ancre": operation.get("apres", ""),
-                      "commentaire": operation.get("commentaire", ""), "score": 1.0}
+            detail["score"] = 1.0
+            resultat = _inserer(document, ancre, operation.get("texte", ""), detail["note"])
         elif genre == "remplacement":
-            resultat, score = _remplacer(document, operation.get("cible", ""),
-                                         operation.get("texte", ""),
-                                         operation.get("commentaire"))
-            detail = {"type": "remplacement", "ancre": operation.get("cible", ""),
-                      "commentaire": operation.get("commentaire", ""), "score": score}
+            detail["score"] = 1.0
+            resultat, detail["score"] = _remplacer(document, ancre, operation.get("texte", ""),
+                                                   detail["note"])
         elif genre == "suppression":
-            resultat, score = _supprimer(document, operation.get("cible", ""),
-                                         operation.get("commentaire"))
-            detail = {"type": "suppression", "ancre": operation.get("cible", ""),
-                      "commentaire": operation.get("commentaire", ""), "score": score}
+            detail["score"] = 1.0
+            resultat, detail["score"] = _supprimer(document, ancre, detail["note"])
         else:
-            rapport["introuvables"].append({"type": genre or "inconnue",
-                                            "ancre": operation.get("ancre", "")})
+            detail["type"] = genre or "inconnue"
+            rapport["introuvables"].append(detail)
             continue
 
         if resultat:
@@ -393,65 +456,89 @@ def _pieces_du_modele(chemin):
     return [pdf] if pdf.exists() else []
 
 
+def _consequences_en_texte(consequences):
+    if not consequences:
+        return ""
+    lignes = []
+    for consequence in consequences:
+        if isinstance(consequence, dict):
+            lignes.append(
+                f"- [{consequence.get('type') or ''}] {consequence.get('consequence') or ''} "
+                f"(certitude : {consequence.get('certitude') or 'possible'} ; "
+                f"{(consequence.get('source') or {}).get('url') or 'source à confirmer'})")
+        else:
+            lignes.append(f"- {consequence}")
+    return "CONSÉQUENCES RELEVÉES\n" + "\n".join(lignes)
+
+
+def _contradictions_en_texte(contradictions):
+    if isinstance(contradictions, str):
+        try:
+            contradictions = json.loads(contradictions).get("contradictions", [])
+        except (json.JSONDecodeError, AttributeError):
+            return "CONTRADICTIONS RELEVÉES\n" + contradictions
+    if not contradictions:
+        return ""
+    lignes = []
+    for contradiction in contradictions:
+        if isinstance(contradiction, dict):
+            demandes = ", ".join(str(d) for d in contradiction.get("demandes_concernees") or [])
+            lignes.append(
+                f"- {demandes} : {contradiction.get('probleme') or ''} "
+                f"(articles : {', '.join(str(a) for a in contradiction.get('articles') or []) or '—'} ; "
+                f"{contradiction.get('certitude') or 'possible'})")
+        else:
+            lignes.append(f"- {contradiction}")
+    return "CONTRADICTIONS RELEVÉES\n" + "\n".join(lignes)
+
+
 def _planifier(synthese, demandes_clients, commentaires, elements_factuels,
-               consequences, commentaires_consequences, chemin, model=None):
-    corps = ["SYNTHÈSE DU DOSSIER", (synthese or "").strip() or "(aucune)"]
-    if elements_factuels:
-        faits = "\n".join(
-            f"- {json.dumps(f, ensure_ascii=False) if not isinstance(f, str) else f}"
-            for f in elements_factuels
-        )
-        corps.append("ÉLÉMENTS FACTUELS\n" + faits)
-    if demandes_clients:
-        demandes = "\n".join(
-            f"- {json.dumps(d, ensure_ascii=False) if not isinstance(d, str) else d}"
-            + (f"  (commentaire : {commentaires[i]})" if i < len(commentaires or []) else "")
-            for i, d in enumerate(demandes_clients)
-        )
-        corps.append("DEMANDES DU CLIENT\n" + demandes)
-    if consequences:
-        liste = "\n".join(
-            f"- [{c.get('type', '')}] {c.get('consequence', '')} "
-            f"(source : {(c.get('source') or {}).get('url', 'aucune')})"
-            for c in consequences if isinstance(c, dict)
-        )
-        corps.append("CONSÉQUENCES SIGNALÉES\n" + liste)
+               contradictions, consequences, commentaires_consequences,
+               droit_applicable, chemin, model=None):
+    """Demande à Augure le plan de complétion du modèle, selon le prompt de l'étape 8."""
+    corps = [PROMPT_ACTE.strip(),
+             corps_demande(synthese, elements_factuels, demandes_clients, commentaires,
+                           droit_applicable),
+             _contradictions_en_texte(contradictions),
+             _consequences_en_texte(consequences)]
     if commentaires_consequences:
         corps.append("COMMENTAIRES SUR LES CONSÉQUENCES\n"
                      + "\n".join(f"- {c}" for c in commentaires_consequences))
+    demande = "\n\n".join(section for section in corps if section)
 
-    demande = (
-        "Voici le modèle d'acte du Répertoire de droit en pièces. Prépare le projet d'acte "
-        "adapté à ce dossier : souligne ce qui doit être vérifié, remplace ce qui est faux "
-        "pour ce dossier, ajoute les clauses qui manquent. N'invente rien qui ne soit pas "
-        "dans le dossier ou dans les conséquences ci-dessous.\n\n"
-        + "\n\n".join(corps)
-    )
     pieces = _pieces_du_modele(chemin)
     if not pieces:
         demande += "\n\nTEXTE DU MODÈLE D'ACTE\n" + texte_document(chemin)[:80000]
     plan = ask_augure(demande, fichiers=pieces, sortie_json=True,
                       consignes=SCHEMA_PLAN.strip(), model=model)
-    if isinstance(plan, dict):
-        plan.setdefault("operations", [])
-        plan["consequences_a_rappeler"] = consequences or []
-        return plan
-    return {"operations": [], "questions_au_client": [], "consequences_a_rappeler": consequences or []}
+    if not isinstance(plan, dict):
+        plan = {"reponse_brute": plan}
+    plan.setdefault("ajouts", [])
+    plan.setdefault("surlignages", [])
+    plan.setdefault("signalees", [])
+    plan["consequences_a_rappeler"] = consequences or []
+    return plan
 
 
 def create_acte_modifie(synthese, demandes_clients, commentaires, elements_factuels,
-                        consequences, commentaires_consequences=(), dossier=None, acte_id=None,
+                        consequences, commentaires_consequences=(), contradictions=None,
+                        droit_applicable=None, dossier=None, acte_id=None,
                         sortie=None, model=None, plan=None):
-    """Produit le projet d'acte annoté. Renvoie le chemin du fichier Word.
+    """Complète le modèle d'acte pour ce dossier. Renvoie le chemin du fichier Word.
+
+    Tout ce qui est ajouté est en rouge et en révision suivie ; les passages touchés
+    par une contradiction ou une conséquence sont surlignés, avec une note à côté ;
+    les clauses du modèle qui ne s'appliquent pas sont signalées, jamais retirées.
+    Un rapport des modifications est écrit à côté, en ``.rapport.json``.
 
     ``plan`` : rejouer un plan déjà calculé au lieu d'en demander un nouveau.
-    Le rapport des modifications est écrit à côté, en ``.rapport.json``.
     """
     chemin_source = db.get_acte_source(dossier, acte_id)
     document = Document(str(chemin_source))
     if plan is None:
         plan = _planifier(synthese, demandes_clients, commentaires, elements_factuels,
-                          consequences, commentaires_consequences, chemin_source, model)
+                          contradictions, consequences, commentaires_consequences,
+                          droit_applicable, chemin_source, model)
 
     rapport = appliquer_plan(document, plan)
     rapport.update({

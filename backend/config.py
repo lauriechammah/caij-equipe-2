@@ -32,14 +32,35 @@ def _charger_env():
             os.environ.setdefault(cle.strip(), valeur.strip().strip('"').strip("'"))
 
 
+def _url_compagnon(base):
+    """Adresse complète de l'endpoint, que la variable soit donnée avec ou sans le chemin.
+
+    L'équipe peut remettre ``https://…/semantic-search`` ou seulement la racine de
+    l'instance ; les deux écritures doivent aboutir au même appel.
+    """
+    base = base.strip().rstrip("/")
+    if "://" not in base:
+        base = f"https://{base}"
+    return base if base.endswith("/semantic-search") else f"{base}/semantic-search"
+
+
 def valeurs():
-    """Retourne la configuration effective, en rechargeant le ``.env`` si besoin."""
+    """Retourne la configuration effective, en rechargeant le ``.env`` si besoin.
+
+    Une variable présente mais vide — ce que donne ``.env.example`` une fois copié —
+    est traitée comme absente, sinon l'URL de base finirait vide.
+    """
+
+    def lire(nom, defaut):
+        return (os.environ.get(nom) or "").strip() or defaut
+
     _charger_env()
     return {
-        "augure_cle": os.environ.get("AUGURE_API_KEY", ""),
-        "augure_modele": os.environ.get("AUGURE_MODEL") or MODELE_AUGURE,
-        "augure_base": os.environ.get("AUGURE_BASE_URL", "https://api.augureai.ca/v1"),
-        "compagnon_url": os.environ.get("COMPAGNON_API_URL", "https://hackathon.caij.qc.ca"),
+        "augure_cle": lire("AUGURE_API_KEY", ""),
+        "augure_modele": lire("AUGURE_MODEL", MODELE_AUGURE),
+        "augure_base": lire("AUGURE_BASE_URL", "https://api.augureai.ca/v1"),
+        "compagnon_url": _url_compagnon(
+            lire("COMPAGNON_API_URL", "https://hackathon.caij.qc.ca")),
         "racine": ROOT,
         "dossiers": DOSSIERS,
         "modeles": MODELES,
