@@ -1,0 +1,48 @@
+ESTIMATION PRÉLIMINAIRE — MISE EN CONFORMITÉ
+
+Atelier Brisebois architectes
+Mandat : 12 509, boulevard Beauport, Montréal — quai de livraison et monte-charge
+Cliente : Luxury Furnitures inc.
+Date : 28 avril 2026
+Préparé par : Laurence Brisebois, architecte, avec la collaboration de Gestion Structura, ingénieurs
+
+1. Constats
+
+-   Le quai de livraison a été construit sans plans. La dalle et la rampe sont en bon état apparent. Le quai empiète de 1,82 m dans la marge arrière, selon le relevé de l’arpenteur-géomètre.
+-   La gaine du monte-charge traverse deux dalles. Les ouvertures n’ont pas été renforcées selon les règles de l’art. La séparation coupe-feu de la gaine est incomplète.
+-   L’appareil lui-même est récent et fonctionnel.
+-   L’absence de permis se vérifie par une simple demande d’historique des permis auprès de l’arrondissement. Le délai de réponse habituel est de dix jours ouvrables. L’empiètement, lui, n’est pas visible à l’œil nu : il a fallu un relevé d’arpentage pour l’établir.
+
+2. Scénario A — Régularisation sur place
+
+Ce scénario suppose que le conseil d’arrondissement accorde une dérogation mineure pour l’empiètement du quai.
+
+-   Relevés, plans et demandes de permis : 48 000 $
+-   Demande de dérogation mineure : 9 000 $
+-   Renforcement des ouvertures de dalle et gaine coupe-feu : 236 000 $
+-   Corrections au quai et à la rampe : 74 000 $
+-   Attestation d’ingénieur et remise en service du monte-charge : 45 000 $
+
+Total du scénario A : 412 000 $, avant taxes.
+Durée : six à neuf mois. Monte-charge hors service pendant environ cinq mois.
+
+3. Scénario B — Refus de la dérogation
+
+Démolition de la partie non conforme du quai et reconstruction d’un quai réduit sur le côté latéral de l’immeuble, avec modification des accès.
+
+Total du scénario B : 780 000 $, avant taxes, y compris les travaux du monte-charge du scénario A.
+Durée : douze à quatorze mois.
+
+4. Chances d’obtenir la dérogation
+
+Nous ne pouvons pas les chiffrer. L’empiètement est important et l’immeuble donne sur une ruelle partagée avec des voisins résidentiels. De plus, à notre connaissance, une dérogation mineure visant des travaux déjà exécutés suppose en principe que ces travaux aient fait l’objet d’un permis et aient été exécutés de bonne foi. La question de savoir si cette règle serait opposée à la cliente, qui n’a pas réalisé les travaux, dépasse notre mandat et devrait être soumise à ses avocats.
+
+5. Renseignements fournis par la cliente (non vérifiés par nous)
+
+-   Coût de l’aménagement du point de vente au deuxième étage, d’octobre 2025 à février 2026 : 1 150 000 $.
+-   Pendant l’arrêt du monte-charge, les meubles sont montés à la main par l’escalier. Coût supplémentaire de main-d’œuvre : environ 18 000 $ par mois.
+-   Baisse des ventes anticipée par la cliente : environ 55 000 $ par mois.
+
+------------------------------------------------------------------------
+
+Document fictif — Hackathon CAIJ. Personnes, entreprises et faits inventés.

@@ -1,0 +1,29 @@
+Hackathon CAIJ — Défi 2 : les modèles d’actes
+
+Six dossiers fictifs, un par modèle d’acte. Chaque dossier contient ce qu’un notaire aurait en main au moment de rédiger : des notes d’entrevue, des courriels, des questionnaires, des notes d’examen des titres.
+
+Votre mission : bâtir un assistant capable de préparer le projet d’acte à partir du modèle et du dossier.
+
+Les dossiers
+
+  Dossier                    Modèle d’acte
+  -------------------------- ------------------------------------------------------------------------
+  mandat_protection          Mandat de protection (Mandat, Document 2)
+  testament_simple_fiducie   Testament simple avec fiducie pour enfants (Libéralités, Document 3.7)
+  vente_immeuble_comptant    Vente d’un immeuble au comptant (Vente, Document 2.1)
+  servitude_enclave          Servitude de passage en cas d’enclave (Biens, Document 3.2)
+  convention_indivision      Convention d’indivision (Biens, Document 2)
+  charte_vie_commune         Charte de vie commune (Famille, Document 11.1)
+
+Contenu de chaque dossier
+
+-   word/ — les pièces en format Word (.docx)
+-   txt/ — les mêmes pièces en texte brut (.txt, UTF-8), plus faciles à donner à un programme
+
+Commencez par « 0 - Mise en contexte et mandat ».
+
+À savoir
+
+-   Tout est fictif : les personnes, les adresses, les numéros de lot et d’inscription, les faits.
+-   Les modèles, eux, sont réels. Lisez la version PDF annotée : les notes des auteurs expliquent quand retenir chaque option.
+-   Les dossiers ressemblent à de vrais dossiers : ils sont incomplets, et les gens ne disent pas tous la même chose.

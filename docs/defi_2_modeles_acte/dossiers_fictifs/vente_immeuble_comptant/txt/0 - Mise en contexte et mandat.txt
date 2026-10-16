@@ -1,0 +1,33 @@
+Dossier Lapointe / Simard-Tran — Vente d’un duplex
+
+Dossier fictif — Hackathon CAIJ. Les personnes, les adresses, les numéros de lot et les faits sont inventés.
+
+Votre rôle
+
+Vous travaillez à l’étude de Me François Gendron, notaire à Québec. Les acheteurs d’un duplex du quartier Limoilou ont choisi Me Gendron pour recevoir l’acte de vente. La signature est prévue le vendredi 20 novembre 2026.
+
+Ce qu’on vous demande
+
+Préparer le projet d’acte de vente à partir du modèle « Vente d’un immeuble au comptant », R.D./N.S., Vente, Document 2.1 (fourni en PDF annoté et en Word).
+
+Le modèle contient des choix (« ou »), des clauses « s’il y a lieu » et des blancs. À vous de décider comment votre assistant s’y prend pour passer du dossier au projet d’acte.
+
+Les pièces du dossier
+
+1.  Résumé de la promesse d’achat acceptée
+2.  Déclarations du vendeur sur l’immeuble
+3.  Notes d’examen des titres et du certificat de localisation
+4.  Courriel du vendeur, 26 octobre 2026
+5.  Courriel des acheteurs, 28 octobre 2026
+
+Les personnes
+
+-   Yvon Lapointe — le vendeur, 69 ans, retraité
+-   Diane Bélanger — son épouse
+-   Gabrielle Simard et Olivier Tran — les acheteurs, conjoints de fait
+-   Huguette Simard — la mère de Gabrielle
+-   Marcel Thibault — le locataire du logement du haut
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Document fictif — Hackathon CAIJ. Personnes et faits inventés.

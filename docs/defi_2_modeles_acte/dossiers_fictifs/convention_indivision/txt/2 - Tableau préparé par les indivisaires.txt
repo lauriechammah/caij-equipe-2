@@ -1,0 +1,31 @@
+Tableau des indivisaires
+
+Fichier « Triplex Chabot - nos parts.xlsx », préparé par Jérémie Lavoie et envoyé le 14 octobre 2026. Transcription.
+
+Parts et mises de fonds
+
+  Indivisaire                      Logement                         Superficie   Mise de fonds   Part convenue
+  -------------------------------- -------------------------------- ------------ --------------- ---------------
+  Camille Bouchard                 6410 (rez-de-chaussée et cour)   118 m²       140 000 $       40 %
+  Jérémie Lavoie et Maude Nguyen   6412 (2e étage)                  104 m²       110 000 $       35 %
+  Antoine Rivard                   6414 (3e étage)                  96 m²        50 000 $        30 %
+  Total                                                             318 m²       300 000 $       
+
+Versements mensuels au compte conjoint
+
+  Indivisaire                      Hypothèque   Taxes, assurance et entretien   Total par mois
+  -------------------------------- ------------ ------------------------------- ----------------
+  Camille Bouchard                 2 080 $      420 $                           2 500 $
+  Jérémie Lavoie et Maude Nguyen   1 820 $      368 $                           2 188 $
+  Antoine Rivard                   1 560 $      315 $                           1 875 $
+
+Notes de Jérémie
+
+-   La mise de fonds de notre part : 55 000 $ de moi et 55 000 $ de Maude.
+-   Les parts ont été convenues entre nous trois au souper du 12 septembre, selon la valeur des logements.
+-   Gérant : moi, pour 3 ans. Je propose 200 $ par mois, vu le temps que ça prend.
+-   Fonds de prévoyance : on propose 5 % des charges.
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Document fictif — Hackathon CAIJ. Personnes et faits inventés.

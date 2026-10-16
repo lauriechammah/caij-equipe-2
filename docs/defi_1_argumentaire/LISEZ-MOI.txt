@@ -1,0 +1,23 @@
+Hackathon CAIJ — Cas « IkéÔ c. 123 456 Québec inc. »
+
+Un acheteur commercial découvre, après la vente, que le quai de livraison et le monte-charge de son immeuble ont été construits sans permis, et que son vendeur le savait.
+
+Votre mission : produire le meilleur argumentaire possible pour IkéÔ, la demanderesse.
+
+Par où commencer
+
+1.  Lisez « 0 - Mise en contexte et mandat ».
+2.  Lisez les pièces : 8 pour la demanderesse (P-1 à P-8), 3 communiquées par la défenderesse (D-1 à D-3).
+
+Contenu de la clé
+
+-   word/ — tous les documents en format Word (.docx)
+-   txt/ — les mêmes documents en texte brut (.txt, UTF-8), plus faciles à donner à un programme
+
+Les deux dossiers ont le même contenu. Prenez le format qui vous convient.
+
+À savoir
+
+-   Tout est fictif : les personnes, les entreprises, les adresses, les numéros de dossier et les faits.
+-   Le droit est réel. Les lois, les décisions et la doctrine que vous citez doivent exister et dire ce que vous leur faites dire. Une source inventée disqualifie.
+-   Les pièces ne racontent pas toutes la même histoire, et certaines nuisent à votre cliente. C’est voulu.
