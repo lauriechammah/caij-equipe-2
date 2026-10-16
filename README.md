@@ -98,6 +98,29 @@ curl -N -X POST https://hackathon.caij.qc.ca/semantic-search \
 
 **Une source inventée disqualifie** : toute citation doit venir du Compagnon, avec son `original_url`.
 
+## Backend
+
+`backend/` reprend les deux clients ci-dessus en fonctions : un prompt, du JSON en sortie.
+
+```bash
+python -m venv .venv && .venv/bin/pip install -r backend/requirements.txt
+.venv/bin/python -m backend.essais     # vérifications hors ligne, sans clé
+```
+
+```python
+from backend import ask_augure, ask_compagnon, get_contradictions, get_type_consequences, create_acte_modifie
+
+ask_augure("Quelles informations se contredisent ?", dossier="mandat_protection")
+ask_compagnon("homologation du mandat de protection")
+get_contradictions(demandes_clients, commentaires, synthese, elements_factuels)      # -> JSON
+get_type_consequences(demandes_clients, commentaires, types, synthese, faits)        # -> liste
+create_acte_modifie(synthese, demandes_clients, commentaires, faits, consequences, cmts)  # -> chemin du .docx
+```
+
+L'acte produit porte les ajouts en révision suivie, les passages à vérifier surlignés et
+commentés, et une annexe de questions à trancher avec les urls des sources. Détail et
+démarches : [`backend/README.md`](backend/README.md).
+
 ## Critères du jury
 
 1. Pertinence et utilité · 2. Valeur ajoutée · 3. Faisabilité · 4. Prise en compte des risques · 5. Présentation et démo
@@ -114,5 +137,11 @@ docs/
 scripts/
   augure.py           client Augure : envoie dossier/modèle, renvoie la réponse
   compagnon.py        client Compagnon : recherche dans les sources du CAIJ
+backend/
+  llm.py              ask_augure / ask_compagnon : un prompt, du JSON
+  analyse.py          get_contradictions, get_type_consequences
+  acte.py             create_acte_modifie : l'acte Word annoté
+  db.py               squelette : où trouver le document de départ
+  essais.py, cli.py   vérifications hors ligne, essai de bout en bout
 .env.example          variables d'environnement à copier dans .env
 ```
