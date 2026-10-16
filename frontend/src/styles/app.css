@@ -71,11 +71,12 @@ button:disabled {
 
 /* ---------- Éléments communs ---------- */
 
+/* 48 px de haut (40 px dans la maquette), même recadrage. */
 .logo {
   position: relative;
   display: block;
-  width: 158.6px;
-  height: 40px;
+  height: 48px;
+  aspect-ratio: 158.6 / 40;
   overflow: hidden;
 }
 
@@ -1708,5 +1709,320 @@ button:disabled {
   }
   .milieu__contenu {
     padding: 24px;
+  }
+}
+
+/* ---------- Animations ---------- */
+
+@keyframes fondu {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fondu-sortie {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes monter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+/* Écran d'ouverture : logo en gros plan pendant 3 s, puis vol vers la barre de l'accueil */
+
+/* 100vw : le centre ne bouge pas quand la barre de défilement réapparaît pendant le vol du logo. */
+.ouverture {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ouverture--sortie {
+  pointer-events: none;
+}
+
+/* Pas de barre de défilement derrière le logo en gros plan. */
+:root:has(.ouverture:not(.ouverture--sortie)) {
+  overflow: hidden;
+}
+
+.ouverture__fond {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 60% 50% at 50% 50%, var(--marque-teinte), var(--fond-surface) 72%);
+  transition: opacity 700ms var(--courbe-entree) 100ms;
+}
+
+.ouverture--sortie .ouverture__fond {
+  opacity: 0;
+}
+
+.ouverture__centre {
+  position: relative;
+}
+
+.ouverture__logo.logo {
+  width: min(76vw, 760px);
+  height: auto;
+  animation: ouverture-logo 1100ms var(--courbe-entree) 150ms both;
+}
+
+/* Reflet qui balaie le logo, masqué par le logo lui-même (l'image est transparente). */
+.ouverture__logo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 0.75) 50%, transparent 58%) no-repeat;
+  background-size: 250% 100%;
+  -webkit-mask: var(--logo-image) 50.38% 49.79% / 122.43% 264.83% no-repeat;
+  mask: var(--logo-image) 50.38% 49.79% / 122.43% 264.83% no-repeat;
+  animation: ouverture-reflet 1200ms ease-in-out 1300ms both;
+}
+
+.ouverture__progression {
+  position: absolute;
+  top: calc(100% + 36px);
+  left: 50%;
+  width: 160px;
+  height: 2px;
+  margin-left: -80px;
+  overflow: hidden;
+  border-radius: 1px;
+  background: var(--bordure-defaut);
+  transition: opacity 300ms ease;
+}
+
+.ouverture__progression::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--accent-vif);
+  transform-origin: left;
+  animation: ouverture-progression 3000ms linear both;
+}
+
+.ouverture--sortie .ouverture__progression {
+  opacity: 0;
+}
+
+@keyframes ouverture-logo {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+    filter: blur(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes ouverture-reflet {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+@keyframes ouverture-progression {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Le logo de la barre reste caché jusqu'à ce que le logo en gros plan s'y pose. */
+.accueil--ouverture .accueil__barre .logo {
+  visibility: hidden;
+}
+
+/* Entrée en cascade du contenu de l'accueil, pendant que le fond de l'ouverture s'efface. */
+.accueil--entree :is(.accueil__entete, .nouveau, .accueil__section, .carte) {
+  animation: monter 600ms var(--courbe-entree) both;
+}
+
+.accueil--entree .accueil__entete {
+  animation-delay: 150ms;
+}
+
+.accueil--entree .nouveau {
+  animation-delay: 220ms;
+}
+
+.accueil--entree .accueil__section {
+  animation-delay: 290ms;
+}
+
+.accueil--entree .carte:nth-child(1) {
+  animation-delay: 340ms;
+}
+
+.accueil--entree .carte:nth-child(2) {
+  animation-delay: 390ms;
+}
+
+.accueil--entree .carte:nth-child(3) {
+  animation-delay: 440ms;
+}
+
+.accueil--entree .carte:nth-child(4) {
+  animation-delay: 490ms;
+}
+
+.accueil--entree .carte:nth-child(5) {
+  animation-delay: 540ms;
+}
+
+.accueil--entree .carte:nth-child(n + 6) {
+  animation-delay: 590ms;
+}
+
+/* Transitions entre les écrans (View Transitions API).
+   La barre, l'arborescence et le rail restent en place quand ils existent des deux côtés
+   (planification ↔ éditeur) ; sinon ils glissent avec le reste de la page. */
+
+:root {
+  --decalage: 28px;
+}
+
+:root[data-sens="arriere"] {
+  --decalage: -28px;
+}
+
+.barre {
+  view-transition-name: barre-espace;
+}
+
+.arbo {
+  view-transition-name: arborescence;
+}
+
+.rail {
+  view-transition-name: rail-augure;
+}
+
+::view-transition-group(*) {
+  animation-duration: var(--duree-ecran);
+  animation-timing-function: var(--courbe-entree);
+}
+
+::view-transition-old(root),
+::view-transition-old(*):only-child {
+  animation: ecran-sortie 220ms var(--courbe-sortie) both;
+}
+
+::view-transition-new(root),
+::view-transition-new(*):only-child {
+  animation: ecran-entree var(--duree-ecran) var(--courbe-entree) 80ms both;
+}
+
+@keyframes ecran-sortie {
+  to {
+    opacity: 0;
+    transform: translateX(calc(var(--decalage) * -1));
+  }
+}
+
+@keyframes ecran-entree {
+  from {
+    opacity: 0;
+    transform: translateX(var(--decalage));
+  }
+}
+
+/* Ouverture du dialogue « Nouveau mandat » */
+
+.voile {
+  animation: fondu 240ms ease-out both;
+}
+
+.dialogue {
+  animation: dialogue-entree 320ms var(--courbe-entree) both;
+}
+
+@keyframes dialogue-entree {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+
+/* Changement d'étape dans la planification */
+
+.milieu {
+  overflow: hidden;
+}
+
+.milieu__contenu--avant {
+  animation: etape-avant var(--duree-etape) var(--courbe-entree) both;
+}
+
+.milieu__contenu--arriere {
+  animation: etape-arriere var(--duree-etape) var(--courbe-entree) both;
+}
+
+@keyframes etape-avant {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+
+@keyframes etape-arriere {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+
+.etape__pastille {
+  transition:
+    background-color 300ms ease,
+    border-color 300ms ease,
+    color 300ms ease;
+}
+
+.stepper__lien {
+  transition: background-color 400ms ease;
+}
+
+/* Mouvement réduit : fondus seulement (l'ouverture garde ses 3 secondes). */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-old(*):only-child {
+    animation: fondu-sortie 180ms ease both;
+  }
+
+  ::view-transition-new(root),
+  ::view-transition-new(*):only-child {
+    animation: fondu 180ms ease both;
+  }
+
+  .ouverture__logo.logo,
+  .dialogue,
+  .milieu__contenu--avant,
+  .milieu__contenu--arriere,
+  .accueil--entree :is(.accueil__entete, .nouveau, .accueil__section, .carte) {
+    animation-name: fondu;
+  }
+
+  .ouverture__logo::after {
+    display: none;
   }
 }
