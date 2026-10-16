@@ -1,153 +1,64 @@
-# CAIJ Hackathon 2026 — Équipe 2 · Défi 2 (Notarial)
+# CAIJ Hackathon 2026, équipe 2, défi 2 (notarial)
 
-**L'assistant de rédaction d'actes** : aider le notaire à passer d'un modèle d'acte du Répertoire de droit / Nouvelle série à un projet d'acte adapté à son dossier client.
+L'assistant de rédaction d'actes aide le notaire à passer d'un modèle du Répertoire de droit à un projet d'acte adapté à son dossier client.
 
-> « Ce document ne doit pas être utilisé dans son intégralité, mais plutôt refléter avec précision la situation et les volontés réelles du mandant. »
+Le thème du hackathon est l'IA qui critique, pas l'IA qui fait tout. L'assistant ne livre pas un acte fini : il relève les contradictions, les informations manquantes et les conséquences à discuter, puis il pose les questions. Le notaire valide chaque étape et décide.
 
-Le thème du hackathon, c'est **l'IA qui critique, pas l'IA qui fait tout**. L'assistant ne livre pas un acte fini : il signale les contradictions du dossier, les informations manquantes et les options du modèle à trancher, puis il pose les questions. Le notaire décide et sait pourquoi.
+## Le pipeline en 8 étapes
 
-## Les six dossiers
+1. Synthèse de la demande des clients (prompt 1).
+2. Articles applicables du Code civil et du Code de procédure civile : Augure formule des requêtes, le Compagnon cherche les articles en vigueur, Augure retient ceux qui s'appliquent (prompt 2).
+3. Synthèse du droit applicable (prompt 3).
+4. Éléments factuels du dossier (prompt 4).
+5. Demandes des clients, avec celles à confirmer (prompt 5).
+6. Contradictions entre les demandes et avec le droit (prompt 6).
+7. Conséquences possibles, choisies dans `backend/consequences_possibles.txt` selon le type d'acte (prompt 7).
+8. Projet d'acte Word (prompt 8).
 
-| Dossier (`docs/dossiers_fictifs/`) | Modèle d'acte (`docs/modeles/`) |
-| --- | --- |
-| `vente_immeuble_comptant` | Vente d'un immeuble au comptant (Vente, Doc. 2.1) |
-| `servitude_enclave` | Servitude de passage en cas d'enclave (Biens, Doc. 3.2) |
-| `convention_indivision` | Convention d'indivision (Biens, Doc. 2) |
-| `mandat_protection` | Mandat de protection (Mandat, Doc. 2) |
-| `testament_simple_fiducie` | Testament simple avec fiducie pour enfants (Libéralités, Doc. 3.7) |
-| `charte_vie_commune` | Charte de vie commune (Famille, Doc. 11.1) |
+À chaque étape, le notaire coche ou décoche ce qu'Augure propose. Seul ce qui est retenu passe à l'étape suivante.
 
-Chaque dossier contient ses pièces en `word/` et en `txt/`. On commence par « 0 - Mise en contexte et mandat ». Les modèles sont fournis en PDF annoté (avec les notes des auteurs) et en Word.
+Le projet d'acte respecte le modèle à la lettre. Les 3 premières pages du modèle (mise en garde, droits d'auteur) sont ignorées. Le texte du modèle n'est jamais modifié. Les ajouts sont en rouge, en révision suivie, dans la police et la taille du modèle. Les passages touchés par une contradiction ou une conséquence sont surlignés avec une note, et une annexe reprend les questions à poser au client. Le fichier .docx se télécharge depuis l'application.
 
-## Architecture
+Une source inventée disqualifie : chaque article cité vient du Compagnon, avec son URL CAIJ.
 
-```
-Dossier client (txt) + modèle (PDF) ──► Augure ──► analyse, objections, questions
-                                          ▲
-              Compagnon (sources CAIJ) ───┘   jurisprudence, doctrine, législation
-```
+## Organisation du repo
 
-- **Augure** raisonne sur les documents. C'est lui, et **pas Claude**, qui lit et analyse les dossiers.
-- **Compagnon** trouve les passages réels et vérifiables dans les sources du CAIJ.
+- `frontend/` : application React et Vite. Mandats, téléversement des pièces (.txt, .md, .docx), pipeline en 8 étapes, panneau de discussion avec Augure.
+- `backend/` : serveur Python appelé par le frontend (proxy Vite `/api/pipeline`, port 8000).
+  - `serveur.py` : les routes HTTP de chaque étape et le téléchargement des actes.
+  - `fonctions.py` : étapes 1 à 5. `analyse.py` : étapes 6 et 7. `acte.py` : étape 8.
+  - `prompts.py` et `consequences_possibles.txt` : les prompts et la liste des conséquences.
+  - `clients.py` et `llm.py` : appels à Augure et au Compagnon, avec reprise automatique si Augure coupe ou dépasse son délai.
+  - `db.py` : base SQLite `data/documents.db` avec les pièces, les modèles, les actes produits et le cache des réponses. Une étape déjà calculée revient du cache.
+  - `pieces.py` : lecture des pièces téléversées. `journal.py` : journal des étapes dans `out/logs/backend.log`.
+  - `essais.py` : tests hors ligne. `bout_en_bout.py` : les 8 étapes par HTTP sur les dossiers fictifs.
+- `docs/` : les six dossiers fictifs et les six modèles d'actes. Seul Augure les lit, jamais Claude (voir `CLAUDE.md`).
+- `scripts/` : `augure.py` et `compagnon.py`, les clients en ligne de commande d'origine.
 
-## Installation
+## Installation et lancement
 
-```bash
-cp .env.example .env      # puis coller la clé dans AUGURE_API_KEY
-python scripts/augure.py --list-models
-```
-
-Python 3.9 ou plus récent suffit, sans dépendances.
-
-## Utiliser Augure
+Il faut Python 3.9 ou plus récent, Node.js et la clé Augure dans `.env` (copier `.env.example`, puis remplir `AUGURE_API_KEY`). Sous macOS ou Linux, remplacer `.venv/Scripts` par `.venv/bin`.
 
 ```bash
-# Toutes les pièces txt d'un dossier + une question
-python scripts/augure.py --dossier mandat_protection "Quelles informations se contredisent ?"
-
-# Joindre aussi le modèle PDF annoté
-python scripts/augure.py --dossier servitude_enclave --modele "Quelles options du modèle faut-il trancher, et sur quels faits ?"
-
-# Autres options : --model, --effort none|low|medium|high, --system, --file, --out
-python scripts/augure.py --dossier testament_simple_fiducie --out out/testament.md "Liste les questions à poser au client."
+python -m venv .venv
+.venv/Scripts/pip install -r backend/requirements.txt
+.venv/Scripts/python -m backend.serveur
+cd frontend && npm install && npm run dev
 ```
 
-- API : `https://api.augureai.ca/v1`, compatible OpenAI ([docs](https://augureai.ca/docs/api)).
-- Modèles : `rosedale-1` (défaut, contexte de 1M), `ossington-5`, `ossington-4-1` (fort en FR/EN), `tofino-3` (léger).
-- Les PDF sont envoyés en base64 (25 Mo et 200 pages max.). Les `.docx` ne sont pas acceptés : on utilise les `.txt`.
-- Limite de 60 requêtes par minute. Le script utilise le streaming pour éviter le délai de 240 s.
+Autres commandes utiles, à lancer avec le Python du `.venv` :
 
-### Pourquoi pas Claude pour lire les dossiers ?
+- `python -m backend.essais` vérifie le backend sans clé ni réseau.
+- `python -m backend.bout_en_bout` lance les 8 étapes sur les dossiers fictifs (le serveur doit tourner).
+- `python -m backend.db` réimporte `docs/` dans la base, et `python -m backend.db --vider-cache` oublie les réponses en cache.
 
-Les documents passent par Augure. Pour éviter que Claude Code les lise par accident :
+## À savoir
 
-- `.claude/settings.json` interdit à l'outil `Read` d'accéder à `docs/dossiers_fictifs/*/` et `docs/modeles/`.
-- `CLAUDE.md` demande à Claude de passer par `scripts/augure.py`.
-
-**Variante MCP (optionnelle)** : Augure offre aussi un serveur MCP (`ask_augure`, `list_models`, `get_limits`), mais il faut une clé MCP distincte (`aug_mcp_live_…`) à activer dans le tableau de bord développeur :
-
-```bash
-claude mcp add --transport http augure https://mcp.augureai.ca/mcp \
-  --header "Authorization: Bearer aug_mcp_live_…"
-```
-
-## Compagnon (recherche CAIJ)
-
-Aucune clé requise. [Swagger](https://hackathon.caij.qc.ca/docs)
-
-```bash
-python scripts/compagnon.py "servitude de passage enclave"
-python scripts/compagnon.py --types legislation jurisprudence --top-k 5 "homologation mandat de protection"
-python scripts/compagnon.py --summary "durée maximale convention d'indivision"   # + résumé par le Compagnon (plus lent)
-python scripts/compagnon.py --json --out out/resultats.json "fiducie enfants mineurs testament"
-```
-
-Ou directement avec curl :
-
-```bash
-curl -N -X POST https://hackathon.caij.qc.ca/semantic-search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "servitude de passage enclave", "search_types": ["legislation"], "top_k": 5,
-       "semantic_analysis": false, "summarization": false}'
-```
-
-- La réponse arrive en **SSE** : des événements `status` (progression), puis un événement `done` dont le champ `data.message` est une **chaîne JSON** à décoder une deuxième fois.
-- Dans ce JSON, `results` contient un tableau par type (`legislation`, `jurisprudence`, `doctrine`, `topo`). Chaque document a `title`, `content` (l'extrait), `original_url` (le lien CAIJ à citer) et `score`. Les champs `textual_summary` et `follow_up_suggestions` sont remplis si `summarization` est à `true`.
-- Paramètres utiles : `search_types`, `top_k` (1 à 100), `clarifications`, `search_filters` (date, juridiction, tribunal).
-- Le Compagnon peut renvoyer plus de résultats que `top_k` et des types non demandés. Le script les filtre.
-
-**Une source inventée disqualifie** : toute citation doit venir du Compagnon, avec son `original_url`.
-
-## Backend
-
-`backend/` reprend les deux clients ci-dessus en fonctions : un prompt, du JSON en sortie.
-
-```bash
-python -m venv .venv && .venv/bin/pip install -r backend/requirements.txt
-.venv/bin/python -m backend.essais     # vérifications hors ligne, sans clé
-```
-
-```python
-from backend import ask_augure, ask_compagnon, resume_droit_applicable
-from backend import get_contradictions, get_type_consequences, create_acte_modifie
-
-ask_augure("Quelles informations se contredisent ?", dossier="mandat_protection")
-ask_compagnon("homologation du mandat de protection")
-
-droit = resume_droit_applicable(synthese, faits)                       # résumé + liste des articles
-rapport = get_contradictions(demandes, commentaires, synthese, faits, droit_applicable=droit)
-consequences = get_type_consequences(demandes, commentaires, types, synthese, faits,
-                                     droit_applicable=droit)
-chemin = create_acte_modifie(synthese, demandes, commentaires, faits, consequences,
-                             contradictions=json.loads(rapport), droit_applicable=droit)
-```
-
-Les trois étapes suivent les prompts 6, 7 et 8 : les contradictions, les conséquences
-discutables, puis l'acte complété — dont les ajouts sont en rouge et en révision suivie, les
-passages à vérifier surlignés avec une note à côté, et les clauses non applicables signalées
-plutôt que retirées. Détail : [`backend/README.md`](backend/README.md).
+- Le pipeline complet prend environ 20 minutes, surtout à cause d'Augure. Grâce au cache, une relance reprend où l'on s'était arrêté.
+- Les modèles de la vente et de la convention d'indivision sont en .doc (Word 97-2003). Il faut les convertir en .docx avec LibreOffice (`soffice --headless --convert-to docx`) pour produire leur acte.
+- Augure : API compatible OpenAI (`https://api.augureai.ca/v1`), modèle `rosedale-1` par défaut, 60 requêtes par minute.
+- Compagnon : recherche dans les sources du CAIJ, sans clé (`https://hackathon.caij.qc.ca/docs`).
 
 ## Critères du jury
 
-1. Pertinence et utilité · 2. Valeur ajoutée · 3. Faisabilité · 4. Prise en compte des risques · 5. Présentation et démo
-
-Horaire : développement jusqu'à 16 h 15, puis présentations à 16 h 30.
-
-## Arborescence
-
-```
-docs/
-  dossiers_fictifs/   six dossiers clients fictifs (word/ + txt/)
-  modeles/            six modèles d'actes (PDF annoté + Word)
-  Hackathon CAIJ — Les deux défis.pdf
-scripts/
-  augure.py           client Augure : envoie dossier/modèle, renvoie la réponse
-  compagnon.py        client Compagnon : recherche dans les sources du CAIJ
-backend/
-  llm.py              ask_augure / ask_compagnon : un prompt, du JSON
-  analyse.py          get_contradictions, get_type_consequences
-  acte.py             create_acte_modifie : l'acte Word annoté
-  db.py               squelette : où trouver le document de départ
-  essais.py, cli.py   vérifications hors ligne, essai de bout en bout
-.env.example          variables d'environnement à copier dans .env
-```
+Pertinence et utilité, valeur ajoutée, faisabilité, prise en compte des risques, présentation et démo.
