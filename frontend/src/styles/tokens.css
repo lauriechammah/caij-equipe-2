@@ -53,6 +53,8 @@
   /* Police principale : Montserrat, celle du logo AnglesVivants. */
   --police-sans: "Montserrat", system-ui, sans-serif;
   --police-serif: "Source Serif 4", Georgia, serif;
+  /* Projet d'acte : la police des modèles Word (Arial), telle quelle. */
+  --police-acte: Arial, Helvetica, sans-serif;
 
   --ombre-carte: 0 1px 1px rgba(15, 36, 64, 0.05);
   --ombre-page: 0 2px 10px rgba(15, 36, 64, 0.08);

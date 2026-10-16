@@ -1219,7 +1219,7 @@ button:disabled {
 
 .acte__intertitre {
   padding-top: 8px;
-  font-family: var(--police-serif);
+  font-family: var(--police-acte);
   font-size: 16px;
   font-weight: 600;
   line-height: 24px;
@@ -1227,7 +1227,7 @@ button:disabled {
 }
 
 .acte__texte {
-  font-family: var(--police-serif);
+  font-family: var(--police-acte);
   font-size: 15px;
   line-height: 24px;
   outline: none;
@@ -1394,7 +1394,7 @@ button:disabled {
   border: 1px solid var(--document-bordure);
   box-shadow: var(--ombre-page);
   color: var(--document-texte);
-  font-family: var(--police-serif);
+  font-family: var(--police-acte);
   font-size: 15px;
   line-height: 25px;
   caret-color: var(--accent-fond);

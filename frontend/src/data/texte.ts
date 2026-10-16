@@ -4,8 +4,8 @@ import type { Paragraphe } from "./types";
 export function versParagraphes(texte: string): Paragraphe[] {
   return texte
     .split(/\n+/)
-    .map((l) => l.trim())
-    .filter(Boolean)
+    .map((l) => l.trim().replace(/^#+\s*/, ""))
+    .filter((l) => l && !/^-{3,}$/.test(l))
     .map((l) => {
       const m = l.match(/^\*\*(.+?)\*\*\s*(.*)$/);
       return m ? { amorce: m[1], texte: m[2] } : { texte: l.replace(/\*\*/g, "") };

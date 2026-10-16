@@ -66,12 +66,14 @@ def _message(prompt, *sections):
 def _est_article_en_vigueur(doc):
     """Code civil du Québec (CCQ-1991) ou Code de procédure civile (C-25.01).
 
-    Exclut les codes remplacés que le Compagnon renvoie aussi : Code civil du
-    Bas Canada et ancien Code de procédure civile (C-25).
+    Exclut les codes remplacés que le Compagnon renvoie aussi (Code civil du
+    Bas Canada, ancien Code de procédure civile C-25) et les règlements pris
+    sous ces codes (« RLRQ c C-25.01, r 6 »).
     """
     titre = (doc.get("title") or "").lower()
     texte = f"{titre} {doc.get('original_url') or doc.get('url') or ''}".lower()
-    return ("ccq-1991" in texte or "c-25.01" in texte) and "remplac" not in titre
+    return (("ccq-1991" in texte or "c-25.01" in texte)
+            and "remplac" not in titre and not titre.startswith("règlement"))
 
 
 def _augure_liste(prompt, format_json, effort="low"):
@@ -196,7 +198,7 @@ def articles_pertinents(docs, syntdmd, maximum=ARTICLES_MAX):
     if not sources:
         return []
     extraits = "\n\n".join(
-        f"### {doc.get('title')}\nURL : {doc.get('original_url') or doc.get('url')}\n{doc.get('content', '')}"
+        f"### {doc.get('title')}\nURL : {doc.get('original_url') or doc.get('url')}\n{(doc.get('content') or '')[:2000]}"
         for doc in sources
     )
     journal.info("choix des articles (prompt 2) : %d candidats du Compagnon, %s car. d'extraits",
@@ -209,8 +211,6 @@ def articles_pertinents(docs, syntdmd, maximum=ARTICLES_MAX):
             ("Source officielle : articles trouvés par le Compagnon du CAIJ", extraits),
         ),
         FORMAT_ARTICLES,
-        # En « low », Augure renvoyait un tableau vide sans examiner les extraits.
-        effort="medium",
     )
     if not maximum:
         return articles
