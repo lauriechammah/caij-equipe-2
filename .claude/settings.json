@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./docs/dossiers_fictifs/*/**)",
+      "Read(./docs/modeles/**)"
+    ]
+  }
+}

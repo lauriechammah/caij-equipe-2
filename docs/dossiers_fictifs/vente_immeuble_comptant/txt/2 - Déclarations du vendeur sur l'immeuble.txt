@@ -1,0 +1,28 @@
+Déclarations du vendeur sur l’immeuble
+
+Formulaire rempli à la main par M. Yvon Lapointe le 14 septembre 2026 et remis aux acheteurs avant la promesse d’achat. Transcription. Document fictif, rédigé pour l’exercice.
+
+Immeuble : 1482-1484, 9e Avenue, Québec
+
+  Question                                                                                             Réponse du vendeur
+  ---------------------------------------------------------------------------------------------------- ----------------------------------------------------------------------------------------------------------------------
+  Depuis quand êtes-vous propriétaire ?                                                                1998
+  Occupez-vous l’immeuble ?                                                                            Oui, le bas, avec mon épouse.
+  Y a-t-il une hypothèque sur l’immeuble ?                                                             Oui, à la caisse. Il reste à peu près 42 000 $.
+  Y a-t-il une servitude sur l’immeuble ?                                                              Non
+  Avez-vous reçu un avis de la Ville, d’un assureur ou d’un autre organisme au sujet de l’immeuble ?   Non
+  Des travaux ont-ils été faits depuis votre achat ?                                                   Toiture 2011. Fenêtres du bas 2015. Garage détaché construit par mon beau-frère en 2016. Salle de bain du haut 2019.
+  Ces travaux ont-ils été faits avec un permis, lorsqu’il était requis ?                               Je pense que oui.
+  Avez-vous un certificat de localisation ?                                                            Oui, de 2009. Rien n’a changé depuis.
+  Y a-t-il eu des infiltrations d’eau ?                                                                Un peu au sous-sol au printemps 2019. Réglé.
+  Les appareils de chauffage vous appartiennent-ils ?                                                  Oui. Le chauffe-eau du bas est loué.
+  Le logement loué : nom du locataire et loyer                                                         Marcel Thibault. 1 150 $ par mois. Il est là depuis 2012. Bon payeur.
+  Avez-vous reçu un avis du locataire ou donné un avis au locataire ?                                  Non
+  Êtes-vous marié ?                                                                                    Oui, avec Diane Bélanger, depuis 1981.
+  Êtes-vous résident du Canada ?                                                                       Oui. On passe l’hiver en Floride, de novembre à avril.
+
+(s) Yvon Lapointe, 14 septembre 2026
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Document fictif — Hackathon CAIJ. Personnes et faits inventés.

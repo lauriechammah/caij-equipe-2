@@ -1,0 +1,28 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node (au cas où)
+node_modules/
+
+# Fichiers temporaires Word / Office
+~$*
+
+# Sorties générées
+out/
+
+# Éditeurs et OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Réglages Claude Code personnels
+.claude/settings.local.json
