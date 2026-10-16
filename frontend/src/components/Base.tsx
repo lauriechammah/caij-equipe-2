@@ -54,9 +54,9 @@ export function BoutonRetour({ libelle, onClick }: { libelle: string; onClick: (
   );
 }
 
-export function BoutonSuivant({ libelle, onClick }: { libelle: string; onClick: () => void }) {
+export function BoutonSuivant({ libelle, onClick, disabled }: { libelle: string; onClick: () => void; disabled?: boolean }) {
   return (
-    <BoutonPrincipal onClick={onClick}>
+    <BoutonPrincipal onClick={onClick} disabled={disabled}>
       {libelle}
       <Icon nom="arrow-r-blanc" />
     </BoutonPrincipal>

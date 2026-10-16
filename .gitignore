@@ -26,3 +26,6 @@ Thumbs.db
 
 # Réglages Claude Code personnels
 .claude/settings.local.json
+
+# Base SQLite des documents (python -m backend.db la recrée à partir de docs/)
+data/

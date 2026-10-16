@@ -20,6 +20,8 @@ export const MANDATS: Mandat[] = [
 ];
 
 export const TITRE_MANDAT = "Benoit / Morin, charte de vie commune";
+/** Dossier dont le backend lit les pièces (docs/dossiers_fictifs/<nom>/txt). */
+export const DOSSIER_FICTIF = "charte_vie_commune";
 export const CHEMIN_DOSSIER = "Documents › Dossiers › 2026-0644 Benoit-Morin";
 
 export type Fichier = { numero: string; titre: string };

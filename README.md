@@ -98,6 +98,35 @@ curl -N -X POST https://hackathon.caij.qc.ca/semantic-search \
 
 **Une source inventée disqualifie** : toute citation doit venir du Compagnon, avec son `original_url`.
 
+## Backend
+
+`backend/` reprend les deux clients ci-dessus en fonctions : un prompt, du JSON en sortie.
+
+```bash
+python -m venv .venv && .venv/bin/pip install -r backend/requirements.txt
+.venv/bin/python -m backend.essais     # vérifications hors ligne, sans clé
+```
+
+```python
+from backend import ask_augure, ask_compagnon, resume_droit_applicable
+from backend import get_contradictions, get_type_consequences, create_acte_modifie
+
+ask_augure("Quelles informations se contredisent ?", dossier="mandat_protection")
+ask_compagnon("homologation du mandat de protection")
+
+droit = resume_droit_applicable(synthese, faits)                       # résumé + liste des articles
+rapport = get_contradictions(demandes, commentaires, synthese, faits, droit_applicable=droit)
+consequences = get_type_consequences(demandes, commentaires, types, synthese, faits,
+                                     droit_applicable=droit)
+chemin = create_acte_modifie(synthese, demandes, commentaires, faits, consequences,
+                             contradictions=json.loads(rapport), droit_applicable=droit)
+```
+
+Les trois étapes suivent les prompts 6, 7 et 8 : les contradictions, les conséquences
+discutables, puis l'acte complété — dont les ajouts sont en rouge et en révision suivie, les
+passages à vérifier surlignés avec une note à côté, et les clauses non applicables signalées
+plutôt que retirées. Détail : [`backend/README.md`](backend/README.md).
+
 ## Critères du jury
 
 1. Pertinence et utilité · 2. Valeur ajoutée · 3. Faisabilité · 4. Prise en compte des risques · 5. Présentation et démo
@@ -114,5 +143,11 @@ docs/
 scripts/
   augure.py           client Augure : envoie dossier/modèle, renvoie la réponse
   compagnon.py        client Compagnon : recherche dans les sources du CAIJ
+backend/
+  llm.py              ask_augure / ask_compagnon : un prompt, du JSON
+  analyse.py          get_contradictions, get_type_consequences
+  acte.py             create_acte_modifie : l'acte Word annoté
+  db.py               squelette : où trouver le document de départ
+  essais.py, cli.py   vérifications hors ligne, essai de bout en bout
 .env.example          variables d'environnement à copier dans .env
 ```

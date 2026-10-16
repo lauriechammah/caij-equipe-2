@@ -1,0 +1,88 @@
+Servitude – Droit des biens : restriction du droit de propriété et baisse possible de la valeur du fonds servant.
+Servitude – Droit des biens : difficulté de vendre ou d’hypothéquer le fonds servant.
+Servitude – Frais : frais d’arpentage, de description technique et de publication.
+Servitude – Voisinage : conflits sur l’étendue du passage, l’entretien et les réparations.
+Servitude – Extinction : extinction difficile (non-usage de 10 ans, renonciation, confusion, etc.).
+Testament – Fiscal : disposition présumée des biens au décès, avec impôt sur le gain en capital et sur les REER/FERR.
+Testament – Contestation : risque de contestation (incapacité, influence indue, vice de forme).
+Testament – Successoral : caducité du legs si le légataire décède avant le testateur, sans substitut prévu.
+Testament – Planification : aucune planification de l’inaptitude, car le testament ne joue qu’au décès.
+Testament – Protection du légataire : aucune protection particulière pour un légataire mineur ou vulnérable, car le bien lui est remis directement.
+Testament – Droit de la famille : le patrimoine familial et le régime matrimonial sont partagés avant la succession, ce qui réduit les biens disponibles.
+Fiducie – Contrôle : perte de contrôle du constituant sur les biens transférés.
+Fiducie – Fiscal : contribuable distinct avec déclaration annuelle (T3, TP-646), disposition présumée aux 21 ans et imposition au taux maximal pour certaines fiducies.
+Fiducie – Frais : frais de constitution, de gestion, de comptabilité et honoraires du fiduciaire.
+Fiducie – Contractuel : rigidité de l’acte constitutif, modification difficile.
+Fiducie – Gestion : risque de mauvaise gestion ou de conflit entre le fiduciaire et les bénéficiaires.
+Vente au comptant – Patrimonial (vendeur) : perte du bien et de toute garantie de paiement.
+Vente au comptant – Financier (acheteur) : mobilisation d’un capital important, sans levier de financement.
+Vente au comptant – Fiscal : droits de mutation (acheteur), gain en capital possible (vendeur), TPS/TVQ selon le type d’immeuble.
+Vente au comptant – Droit de la famille : la vente de la résidence familiale exige le consentement du conjoint, sinon annulation possible.
+Vente au comptant – Responsabilité : responsabilité du vendeur pour vices cachés ou fausses déclarations.
+Convention de vie commune – Droit de la famille : ne crée pas le statut des conjoints mariés (pas de patrimoine familial, de régime matrimonial, d’obligation alimentaire légale ni de droits successoraux sans testament).
+Convention de vie commune – Droit de la famille : les règles sur la résidence familiale ne s’appliquent pas, sauf si la convention les prévoit.
+Convention de vie commune – Opposabilité : ne lie pas les tiers (créanciers, famille).
+Convention de vie commune – Contractuel : une clause déséquilibrée peut être contestée (ordre public, lésion, vice de consentement).
+Convention de vie commune – Mise à jour : doit être modifiée si la situation change (enfants, achat d’un immeuble, etc.).
+Convention d’indivision – Droit des biens : immobilisation du bien, impossibilité de forcer le partage avant l’échéance, sauf motif sérieux.
+Convention d’indivision – Gestion : désaccords sur la gestion, l’entretien et les décisions importantes.
+Convention d’indivision – Cession : difficulté à vendre ou à hypothéquer sa part, et restrictions de cession (droit de préemption).
+Convention d’indivision – Dettes : responsabilité partagée des dettes liées au bien.
+Convention d’indivision – Successoral et faillite : décès ou faillite d’un indivisaire, avec complications de succession ou de liquidation.
+Convention d’indivision – Fiscal : impact possible lors de la cession d’une quote-part (gain en capital).
+Mandat de protection – Autonomie : perte d’autonomie une fois le mandat homologué, avec limites à l’exercice des droits.
+Mandat de protection – Frais et délais : évaluation médicale et psychosociale, et procédure d’homologation.
+Mandat de protection – Responsabilité : risque d’abus ou de mauvaise gestion par le mandataire.
+Mandat de protection – Contestation : contestation possible par des proches (validité, inaptitude).
+Mandat de protection – Exécution : mandataire incapable ou qui refuse d’agir, avec retour au régime de protection du majeur.
+Mandat de protection – Portée : ne couvre que l’inaptitude, pas le décès.
+Servitude – Fiscal : la servitude constituée à titre onéreux peut être une disposition partielle du fonds servant, avec gain en capital imposable pour son propriétaire.
+Servitude – Fiscal : TPS/TVQ possibles si la constitution est faite à titre onéreux par une personne inscrite.
+Servitude – Fiscal : la baisse de valeur du fonds servant n’est pas automatiquement reconnue dans l’évaluation foncière, d’où une contestation possible auprès de la municipalité.
+Testament – Fiscal : déclaration de revenus finale du défunt, avec parfois des déclarations additionnelles (fiducie testamentaire, droits ou montants à recevoir).
+Testament – Fiscal : le liquidateur est personnellement responsable des impôts impayés s’il distribue les biens sans certificat de décharge.
+Testament – Fiscal : double imposition possible sur les actions d’une société privée (gain en capital au décès, puis dividende au moment de la liquidation).
+Testament – Fiscal : le legs à une personne autre que le conjoint ou la fiducie en sa faveur ne bénéficie pas du roulement fiscal, d’où un gain en capital immédiat (ex. : chalet, immeuble locatif).
+Fiducie – Fiscal : le transfert des biens à la fiducie peut constituer une disposition à la juste valeur marchande, avec gain en capital imposable pour le constituant.
+Fiducie – Fiscal : les règles d’attribution peuvent ramener le revenu de la fiducie dans les mains du constituant.
+Fiducie – Fiscal : obligation de déclarer annuellement les renseignements sur les bénéficiaires, fiduciaires et constituants, avec pénalités en cas de défaut.
+Fiducie – Fiscal : les revenus non attribués aux bénéficiaires sont imposés dans la fiducie, souvent au taux maximal.
+Vente au comptant – Fiscal : récupération de l’amortissement déduit si l’immeuble est locatif ou d’entreprise.
+Vente au comptant – Fiscal : revenu d’entreprise plutôt que gain en capital si la vente est une spéculation (revente rapide), avec imposition à 100 % du profit.
+Vente au comptant – Fiscal : règle sur la revente rapide d’un logement détenu moins de 365 jours, avec perte de l’exemption de résidence principale.
+Vente au comptant – Fiscal : retenue d’impôt à la source si le vendeur est non-résident.
+Vente au comptant – Fiscal : ajustements de taxes municipales et scolaires entre le vendeur et l’acheteur.
+Convention de vie commune – Fiscal : les conjoints de fait sont traités comme des conjoints aux fins fiscales (après 12 mois de vie commune ou avec un enfant), sans avoir le statut civil de conjoints mariés.
+Convention de vie commune – Fiscal : règles d’attribution sur les transferts de biens entre conjoints.
+Convention de vie commune – Fiscal : un seul immeuble peut être désigné résidence principale par couple, ce qui limite l’exemption.
+Convention de vie commune – Fiscal : réduction de certains crédits et prestations calculés selon le revenu familial.
+Convention d’indivision – Fiscal : chaque indivisaire déclare sa quote-part du revenu locatif et des dépenses.
+Convention d’indivision – Fiscal : gain en capital calculé séparément pour chaque quote-part lors de la vente.
+Convention d’indivision – Fiscal : chaque indivisaire doit désigner séparément la résidence principale pour bénéficier de l’exemption.
+Convention d’indivision – Fiscal : droits de mutation possibles si les quotes-parts changent entre indivisaires.
+Mandat de protection – Fiscal : le mandataire est responsable de produire les déclarations de revenus du mandant et de payer les impôts.
+Mandat de protection – Fiscal : la vente de biens par le mandataire peut créer un gain imposable pour le mandant.
+Mandat de protection – Fiscal : l’inaptitude limite les stratégies de planification fiscale (fractionnement du revenu, donations, etc.).
+Servitude – Droit de la famille : la constitution d’une servitude sur la résidence familiale peut exiger le consentement du conjoint, à défaut de quoi l’acte est exposé à l’annulation.
+Servitude – Droit de la famille : la baisse de valeur de l’immeuble grevé réduit la valeur incluse dans le partage du patrimoine familial ou des acquêts, ce qui peut être contesté par l’autre conjoint.
+Testament – Droit de la famille : le divorce ou la dissolution de l’union civile entraîne la caducité des legs faits au conjoint, d’où l’importance de refaire le testament.
+Testament – Droit de la famille : le conjoint de fait n’a aucun droit successoral et n’est protégé que par le testament, sans réserve héréditaire à son profit.
+Testament – Droit de la famille : le conjoint survivant, les enfants ou d’autres proches peuvent réclamer une créance alimentaire contre la succession dans le délai prévu, ce qui réduit les biens légués.
+Testament – Droit de la famille : le legs à un enfant mineur entraîne l’application des règles sur la tutelle, avec administration du bien par un tuteur, reddition de compte et conseil de tutelle.
+Testament – Droit de la famille : le conjoint survivant peut réclamer sa prestation compensatoire ou l’attribution préférentielle de la résidence ou des meubles, ce qui peut contrecarrer les volontés du testateur.
+Fiducie – Droit de la famille : la fiducie peut être attaquée par le conjoint ou les créanciers alimentaires si elle sert à soustraire des biens au partage ou aux aliments (action en inopposabilité).
+Fiducie – Droit de la famille : le tribunal peut tenir compte des droits dans la fiducie pour fixer la pension alimentaire ou la prestation compensatoire.
+Fiducie – Droit de la famille : la fiducie au profit des enfants peut entrer en conflit avec les obligations alimentaires et les droits du conjoint survivant.
+Vente au comptant – Droit de la famille : le prix de vente reçu peut être inclus dans le partage du patrimoine familial ou des acquêts, selon le régime et la qualification du bien (propre ou acquêt).
+Vente au comptant – Droit de la famille : la vente à un prix dérisoire ou à un proche peut être attaquée comme fraude aux droits du conjoint ou d’un créancier alimentaire.
+Vente au comptant – Droit de la famille : en cotitularité entre conjoints, la vente nécessite la signature des deux, et le partage du prix peut créer un conflit en cas de rupture.
+Convention de vie commune – Droit de la famille : les clauses touchant les enfants (garde, pension alimentaire, autorité parentale) ne lient pas le tribunal, qui décide selon l’intérêt de l’enfant.
+Convention de vie commune – Droit de la famille : aucune prestation compensatoire à la rupture, d’où un recours limité à l’enrichissement injustifié.
+Convention de vie commune – Droit de la famille : la rupture n’exige aucune formalité, mais le partage des biens indivis peut exiger un recours en justice si l’entente n’est pas respectée.
+Convention d’indivision – Droit de la famille : la quote-part d’un époux dans la résidence familiale reste soumise à l’exigence de consentement du conjoint pour sa cession ou son hypothèque.
+Convention d’indivision – Droit de la famille : la rupture ou le divorce d’un indivisaire peut entraîner des conflits sur le sort de sa part, malgré l’indivision convenue.
+Convention d’indivision – Droit de la famille : la valeur de la quote-part d’un époux entre dans le partage du patrimoine familial ou des acquêts, selon la nature du bien.
+Mandat de protection – Droit de la famille : le conjoint ne devient pas mandataire automatiquement, et le choix d’un enfant ou d’un proche peut créer des tensions familiales.
+Mandat de protection – Droit de la famille : le mandataire doit tenir compte des obligations alimentaires du mandant envers sa famille, avec risque de conflit avec les proches.
+Mandat de protection – Droit de la famille : sans mandat homologué, la famille doit recourir à la tutelle ou à la curatelle, avec conseil de tutelle composé de proches et procédure plus lourde.
+Mandat de protection – Droit de la famille : le mandataire peut devoir consentir aux soins à la place du mandant (consentement substitué), parfois contre l’avis de la famille.
