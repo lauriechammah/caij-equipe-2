@@ -37,6 +37,7 @@ from docx.text.run import Run
 
 from backend import db
 from backend.analyse import corps_demande
+from backend.journal import chrono, journal
 from backend.llm import ask_augure
 
 AUTEUR = "Assistant CAIJ — équipe 2"
@@ -394,6 +395,7 @@ def _operations(plan):
     return operations
 
 
+@chrono("application du plan au modèle Word")
 def appliquer_plan(document, plan):
     """Applique un plan de modifications à un document ouvert. Retourne un rapport.
 
@@ -492,6 +494,7 @@ def _contradictions_en_texte(contradictions):
     return "CONTRADICTIONS RELEVÉES\n" + "\n".join(lignes)
 
 
+@chrono("plan de l'acte (prompt 8)")
 def _planifier(synthese, demandes_clients, commentaires, elements_factuels,
                contradictions, consequences, commentaires_consequences,
                droit_applicable, chemin, model=None):
@@ -509,6 +512,8 @@ def _planifier(synthese, demandes_clients, commentaires, elements_factuels,
     pieces = _pieces_du_modele(chemin)
     if not pieces:
         demande += "\n\nTEXTE DU MODÈLE D'ACTE\n" + texte_document(chemin)[:80000]
+    journal.info("plan de l'acte : modèle %s, %s", chemin.name,
+                 f"PDF joint ({', '.join(p.name for p in pieces)})" if pieces else "texte du Word recopié")
     plan = ask_augure(demande, fichiers=pieces, sortie_json=True,
                       consignes=SCHEMA_PLAN.strip(), model=model)
     if not isinstance(plan, dict):
@@ -533,7 +538,8 @@ def create_acte_modifie(synthese, demandes_clients, commentaires, elements_factu
 
     ``plan`` : rejouer un plan déjà calculé au lieu d'en demander un nouveau.
     """
-    chemin_source = db.get_acte_source(dossier, acte_id)
+    with chrono("modèle Word du dossier (base)"):
+        chemin_source = db.get_acte_source(dossier, acte_id)
     document = Document(str(chemin_source))
     if plan is None:
         plan = _planifier(synthese, demandes_clients, commentaires, elements_factuels,
@@ -549,7 +555,8 @@ def create_acte_modifie(synthese, demandes_clients, commentaires, elements_factu
     })
 
     chemin = sortie or db.chemin_sortie(dossier)
-    db.enregistrer(document, chemin)
+    with chrono("enregistrement de l'acte"):
+        db.enregistrer(document, chemin)
     rapport["fichier"] = str(chemin)
     rapport["plan"] = plan
     chemin.with_suffix(".rapport.json").write_text(

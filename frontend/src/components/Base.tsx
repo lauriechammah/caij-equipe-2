@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import logo from "../assets/logo-anglesvivants.png";
-import type { Statut } from "../data/mandat";
 import { Icon } from "./Icon";
+
+export type Statut = "À traiter" | "Terminé" | "Exemple";
 
 /** Logo AnglesVivants, recadré dans l'image fournie comme dans Figma. */
 export function Logo() {
@@ -13,7 +14,8 @@ export function Logo() {
 }
 
 export function Pastille({ statut }: { statut: Statut }) {
-  return <span className={`pastille ${statut === "Terminé" ? "pastille--vert" : "pastille--ambre"}`}>{statut}</span>;
+  const couleur = { Terminé: "pastille--vert", "À traiter": "pastille--ambre", Exemple: "pastille--teinte" }[statut];
+  return <span className={`pastille ${couleur}`}>{statut}</span>;
 }
 
 export function Badge({ numero, actif }: { numero: string; actif?: boolean }) {

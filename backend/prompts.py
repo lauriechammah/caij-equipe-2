@@ -4,6 +4,28 @@ Les prompts sont recopiés tels quels. Les données (documents, résumé, faits,
 articles) sont ajoutées à la suite par backend/fonctions.py, chacune sous son titre.
 """
 
+# --- synthese_demande (étape 1) ---
+
+# Prompt 1 – synthèse de la demande. Absent du document « Prompts for code » :
+# rédigé pour le serveur ; à remplacer par le prompt 1 de l'équipe s'il existe.
+PROMPT_SYNTHESE_DEMANDE = """À partir des documents fournis, rédige un résumé général de la demande du client.
+Présente les parties, ce qu'elles demandent au notaire (la demande principale et les demandes accessoires), le contexte et les faits déterminants, et les échéances annoncées.
+Base-toi uniquement sur les documents et n'invente rien. Ne fais pas d'analyse juridique à cette étape. Si une demande est ambiguë ou si les documents se contredisent, signale-le sans trancher."""
+
+FORMAT_SYNTHESE_DEMANDE = (
+    "Réponds uniquement avec un objet JSON, sans texte avant ni après : "
+    '{"titre": les noms de famille des clients séparés par « / » (par exemple « Tremblay / Roy »), '
+    '"synthese": le résumé, en 3 à 6 paragraphes séparés par une ligne vide}.'
+)
+
+# --- Panneau Augure du frontend ---
+
+CONSIGNE_QUESTION = (
+    "Tu es Augure AI, assistant d'un notaire québécois. Tu ne rédiges pas l'acte à sa place : "
+    "tu signales les contradictions, les informations manquantes et les options à trancher, "
+    "en citant les pièces du dossier. Réponds en français, brièvement."
+)
+
 # --- synthesedemandeclients ---
 
 # Prompt 2 – droit applicable (sous-fonction 1 : Compagnon cherche, Augure applique ce prompt).

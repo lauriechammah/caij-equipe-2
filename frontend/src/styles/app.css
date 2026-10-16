@@ -103,6 +103,11 @@ button:disabled {
   color: var(--statut-vert-texte);
 }
 
+.pastille--teinte {
+  background: var(--marque-teinte);
+  color: var(--texte-accent);
+}
+
 .pastille--ambre {
   background: var(--statut-ambre-fond);
   color: var(--statut-ambre-texte);
@@ -550,6 +555,60 @@ button:disabled {
   cursor: pointer;
 }
 
+/* Sélecteur de dossier : icône de dossier à gauche, chevron à droite. */
+.champ__select--icone select {
+  padding-left: 36px;
+}
+
+.champ__select--icone .icone:first-child {
+  left: 12px;
+  right: auto;
+}
+
+.champ__valeur {
+  padding: 9px 12px;
+  background: var(--fond-doux);
+  border: 1px solid var(--bordure-defaut);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.champ__reference {
+  color: var(--texte-secondaire);
+}
+
+.champ__avertissement {
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--statut-ambre-texte);
+}
+
+/* Échec d'un appel au backend, avec « Réessayer ». */
+.echec {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--statut-ambre-bordure);
+  border-radius: 6px;
+  background: var(--statut-ambre-ligne);
+  font-size: 13.5px;
+  line-height: 19px;
+  color: var(--statut-ambre-texte);
+}
+
+.echec code {
+  font-size: 12.5px;
+}
+
+.canevas > .echec {
+  width: 720px;
+  max-width: 100%;
+  margin-bottom: 16px;
+}
+
 .champ__select .icone {
   position: absolute;
   right: 12px;
@@ -784,17 +843,20 @@ button:disabled {
   container-type: inline-size;
 }
 
-/* Colonne étroite (Augure ouvert) : seul le libellé de l'étape active reste affiché. */
-@container (max-width: 860px) {
+/* Colonne étroite (écran de moins de 1440 px, ou Augure ouvert) : seul le libellé de l'étape
+   active reste affiché. En Montserrat, les huit libellés demandent environ 1050 px. */
+@container (max-width: 1050px) {
   .etape:not(.etape--actif) .etape__libelle {
     display: none;
   }
 }
 
+/* Étapes : « 1 Demande → 2 Articles → … », sans pastilles. */
 .stepper {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 8px;
   flex-shrink: 0;
   padding: 14px 24px;
   overflow-x: auto;
@@ -803,70 +865,56 @@ button:disabled {
   border-bottom: 1px solid var(--bordure-defaut);
 }
 
-@media (max-width: 1400px) {
-  .stepper {
-    gap: 6px;
-  }
+.stepper__fleche {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--bordure-stepper);
 }
 
-.stepper__lien {
-  flex: 1;
-  min-width: 6px;
-  height: 1px;
-  background: var(--bordure-stepper);
-}
-
-.stepper__lien--vif {
-  background: var(--accent-vif);
+.stepper__fleche--vif {
+  color: var(--accent-vif);
 }
 
 .etape {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: baseline;
+  gap: 6px;
   flex-shrink: 0;
+  padding: 3px 0;
+  border-bottom: 2px solid transparent;
   font-size: 13px;
   white-space: nowrap;
 }
 
-.etape__pastille {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 12px;
+.etape__numero {
   font-family: var(--police-serif);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
 }
 
-.etape--termine .etape__pastille {
-  background: var(--accent-fond);
+.etape--termine {
+  color: var(--texte-principal);
+}
+
+.etape--termine .etape__numero {
+  color: var(--texte-accent);
 }
 
 .etape--termine:hover .etape__libelle {
   text-decoration: underline;
 }
 
-.etape--actif .etape__pastille {
-  background: var(--fond-surface);
-  border: 2px solid var(--texte-accent);
+.etape--actif {
+  border-bottom-color: var(--accent-vif);
   color: var(--texte-accent);
 }
 
 .etape--actif .etape__libelle {
   font-weight: 600;
-  color: var(--texte-accent);
 }
 
-.etape--avenir .etape__pastille {
-  background: var(--fond-surface);
-  border: 1px solid var(--bordure-stepper);
-  color: var(--texte-secondaire);
-}
-
-.etape--avenir .etape__libelle {
+.etape--avenir {
   color: var(--texte-secondaire);
 }
 
@@ -1169,30 +1217,6 @@ button:disabled {
   color: var(--document-texte);
 }
 
-.acte__titre {
-  font-family: var(--police-serif);
-  font-size: 21px;
-  font-weight: 600;
-  line-height: 28px;
-  letter-spacing: 1.68px;
-  text-align: center;
-  color: var(--document-titre);
-}
-
-.acte__parties {
-  font-family: var(--police-serif);
-  font-size: 15.5px;
-  font-style: italic;
-  line-height: 22px;
-  text-align: center;
-}
-
-.acte__meta {
-  font-size: 12px;
-  text-align: center;
-  color: var(--document-secondaire);
-}
-
 .acte__intertitre {
   padding-top: 8px;
   font-family: var(--police-serif);
@@ -1374,38 +1398,6 @@ button:disabled {
   font-size: 15px;
   line-height: 25px;
   caret-color: var(--accent-fond);
-}
-
-.page__titre {
-  font-size: 22px;
-  font-weight: 600;
-  line-height: 30px;
-  letter-spacing: 1.76px;
-  text-align: center;
-  color: var(--document-titre);
-}
-
-.page__parties {
-  font-size: 16px;
-  font-style: italic;
-  line-height: 22px;
-  text-align: center;
-}
-
-.page__meta {
-  font-family: var(--police-sans);
-  font-size: 12.5px;
-  line-height: normal;
-  text-align: center;
-  color: var(--document-secondaire);
-}
-
-.page__filet {
-  align-self: center;
-  width: 34%;
-  height: 1px;
-  margin: 8px 0;
-  background: var(--document-bordure);
 }
 
 .page h4,
@@ -1991,15 +1983,14 @@ button:disabled {
   }
 }
 
-.etape__pastille {
+.etape {
   transition:
-    background-color 300ms ease,
     border-color 300ms ease,
     color 300ms ease;
 }
 
-.stepper__lien {
-  transition: background-color 400ms ease;
+.stepper__fleche {
+  transition: color 400ms ease;
 }
 
 /* Mouvement réduit : fondus seulement (l'ouverture garde ses 3 secondes). */
@@ -2025,4 +2016,225 @@ button:disabled {
   .ouverture__logo::after {
     display: none;
   }
+}
+
+/* ---------- États sans contenu ---------- */
+
+.liste__vide {
+  padding: 14px 16px;
+  font-size: 13.5px;
+  color: var(--texte-secondaire);
+}
+
+.augure__accueil {
+  font-size: 13.5px;
+  line-height: 19px;
+  color: var(--texte-secondaire);
+}
+
+.discuter__note {
+  font-family: var(--police-sans);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: normal;
+  color: var(--document-annotation);
+}
+
+/* ---------- Chargement d'une étape : symbole dans un anneau ---------- */
+
+.attente {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 320px;
+  padding: 40px 16px;
+  text-align: center;
+}
+
+.attente__cercle {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 120px;
+  height: 120px;
+  margin-bottom: 6px;
+}
+
+.attente__anneau {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  animation: attente-rotation 1.4s linear infinite;
+}
+
+.attente__piste {
+  fill: var(--fond-surface);
+  stroke: var(--bordure-defaut);
+  stroke-width: 3;
+}
+
+.attente__arc {
+  fill: none;
+  stroke: var(--accent-vif);
+  stroke-width: 3;
+  stroke-linecap: round;
+  /* Un quart du cercle (2π × 56 ≈ 352). */
+  stroke-dasharray: 88 264;
+}
+
+/* Le symbole seul, recadré dans l'image du logo (1408 × 768) : carré de 420 px centré sur
+   le symbole ; la bande de droite masque le début du mot « AnglesVivants ». */
+.attente__symbole {
+  position: relative;
+  width: 74px;
+  height: 74px;
+  overflow: hidden;
+  clip-path: polygon(0 0, 100% 0, 100% 37.5%, 95.2% 37.5%, 95.2% 73.5%, 100% 73.5%, 100% 100%, 0 100%);
+  animation: attente-pouls 2.4s ease-in-out infinite;
+}
+
+.attente__symbole img {
+  position: absolute;
+  width: 335.24%;
+  height: 182.86%;
+  left: -29.76%;
+  top: -41.43%;
+  max-width: none;
+}
+
+.attente__message {
+  max-width: 440px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--texte-secondaire);
+}
+
+.attente__duree {
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--texte-accent);
+}
+
+@keyframes attente-rotation {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes attente-pouls {
+  50% {
+    transform: scale(0.94);
+    opacity: 0.85;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .attente__anneau {
+    animation-duration: 6s;
+  }
+
+  .attente__symbole {
+    animation: none;
+  }
+}
+
+/* ---------- Téléversement de pièces ---------- */
+
+.champ__etiquette--action {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.champ__etiquette--action .lien-accent {
+  letter-spacing: normal;
+}
+
+.champ__saisie {
+  padding: 9px 12px;
+  background: var(--fond-surface);
+  border: 1px solid var(--bordure-defaut);
+  border-radius: 6px;
+  outline: none;
+  font-size: 14px;
+}
+
+.champ__saisie:focus {
+  border-color: var(--texte-accent);
+}
+
+.depot-bloc {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.depot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 18px 16px;
+  border: 1.5px dashed var(--bordure-pointille);
+  border-radius: 8px;
+  background: var(--fond-doux);
+  text-align: center;
+  cursor: pointer;
+}
+
+.depot:hover,
+.depot--survol {
+  background: var(--marque-teinte);
+}
+
+.depot__texte {
+  font-size: 13.5px;
+}
+
+.depot__formats {
+  font-size: 12px;
+  color: var(--texte-secondaire);
+}
+
+.depot__liste {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  border: 1px solid var(--bordure-defaut);
+  border-radius: 6px;
+}
+
+.depot__liste li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 10px;
+}
+
+.depot__retirer {
+  display: flex;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.depot__retirer:hover {
+  background: var(--fond-doux);
+}
+
+.televersement__message {
+  padding: 2px 4px 6px;
+  font-size: 12.5px;
+  line-height: 17px;
+  color: var(--statut-vert-texte);
+}
+
+.televersement__message--erreur {
+  color: var(--statut-ambre-texte);
 }

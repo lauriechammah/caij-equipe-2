@@ -1,29 +1,14 @@
-import { Fragment, useRef, useState, type ReactNode } from "react";
-import { demanderAugure } from "../api/augure";
-import * as api from "../api/backend";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import type { Source, Valide } from "../api/source";
+import { Attente } from "../components/Attente";
 import { BoutonRetour, BoutonSuivant } from "../components/Base";
-import { Arborescence, BarreSuperieure, RailAugure } from "../components/Espace";
+import { Arborescence, BarreSuperieure, RailAugure, titreMandat } from "../components/Espace";
 import { Icon } from "../components/Icon";
 import { PanneauAugure } from "../components/PanneauAugure";
-import {
-  ACTE,
-  ANNEXES,
-  ARTICLES,
-  CONSEQUENCES,
-  CONTRADICTIONS,
-  DEMANDES,
-  DOSSIER_FICTIF,
-  ETAPES,
-  FAITS,
-  SYNTHESE_ARTICLES,
-  SYNTHESE_DEMANDE,
-  SYNTHESE_RISQUES,
-  TITRE_MANDAT,
-  type BlocActe,
-  type Element,
-  type EtatCase,
-  type Paragraphe,
-} from "../data/mandat";
+import { ANNEXES, ETAPES } from "../data/etapes";
+import { CONVERSATION_DEMO } from "../data/exemple";
+import { versParagraphes, versTexte } from "../data/texte";
+import type { ActeProduit, Element, EtatCase, Mandat, Paragraphe } from "../data/types";
 
 // Stepper
 
@@ -48,7 +33,7 @@ function EtapePipeline({
       disabled={!onClick}
       aria-current={etat === "actif" ? "step" : undefined}
     >
-      <span className="etape__pastille">{etat === "termine" ? <Icon nom="check-etape" /> : numero}</span>
+      <span className="etape__numero">{numero}</span>
       <span className="etape__libelle">{libelle}</span>
     </button>
   );
@@ -61,7 +46,11 @@ function Stepper({ actif, atteinte, onAller }: { actif: number; atteinte: number
         const etat: EtatEtape = e.numero === actif ? "actif" : e.numero <= atteinte ? "termine" : "avenir";
         return (
           <Fragment key={e.numero}>
-            {i > 0 && <span className={`stepper__lien ${e.numero <= atteinte ? "stepper__lien--vif" : ""}`} />}
+            {i > 0 && (
+              <span className={`stepper__fleche ${e.numero <= atteinte ? "stepper__fleche--vif" : ""}`} aria-hidden="true">
+                →
+              </span>
+            )}
             <EtapePipeline
               numero={e.numero}
               libelle={e.libelle}
@@ -77,30 +66,18 @@ function Stepper({ actif, atteinte, onAller }: { actif: number; atteinte: number
 
 // Zone de texte modifiable (avec « Régénérer »)
 
-function versParagraphes(texte: string): Paragraphe[] {
-  return texte
-    .split(/\n+/)
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .map((l) => {
-      const m = l.match(/^\*\*(.+?)\*\*\s*(.*)$/);
-      return m ? { amorce: m[1], texte: m[2] } : { texte: l.replace(/\*\*/g, "") };
-    });
-}
-
-function versTexte(paragraphes: Paragraphe[]): string {
-  return paragraphes.map((p) => (p.amorce ? `**${p.amorce}** ${p.texte}` : p.texte)).join("\n");
-}
-
 function ZoneTexte({
   initial,
   consigne,
+  demander,
   titre,
   enTete,
   onTexte,
 }: {
   initial: Paragraphe[];
   consigne: string;
+  /** Pose une question à Augure (avec le dossier en contexte) et renvoie sa réponse. */
+  demander: (question: string) => Promise<string>;
   titre?: string;
   enTete?: "crayon";
   /** Reçoit le texte à chaque modification ou régénération. */
@@ -118,17 +95,9 @@ function ZoneTexte({
     setErreur("");
     const actuel = corps.current?.innerText ?? "";
     try {
-      const texte = await demanderAugure(
-        [
-          {
-            role: "user",
-            content:
-              `${consigne}\n\nVersion actuelle :\n${actuel}\n\n` +
-              "Propose une nouvelle version. Un paragraphe par ligne ; si un paragraphe a une amorce, écris-la en **gras**.",
-          },
-        ],
-        TITRE_MANDAT,
-        () => {},
+      const texte = await demander(
+        `${consigne}\n\nVersion actuelle :\n${actuel}\n\n` +
+          "Propose une nouvelle version. Un paragraphe par ligne ; si un paragraphe a une amorce, écris-la en **gras**.",
       );
       if (texte.trim()) {
         setParagraphes(versParagraphes(texte));
@@ -265,25 +234,17 @@ function ListeACocher({
         )}
       </div>
       {elements.map((e, i) => (
-        <ElementACocher key={e.titre} element={e} onBascule={() => basculer(i)} />
+        <ElementACocher key={`${i}-${e.titre}`} element={e} onBascule={() => basculer(i)} />
       ))}
+      {elements.length === 0 && <p className="liste__vide">Aucun élément proposé pour ce dossier.</p>}
     </div>
   );
 }
 
 // Étape 8 : projet d'acte
 
-function ProjetActe({
-  blocs,
-  fichier,
-  onAnnexe,
-}: {
-  blocs: BlocActe[];
-  /** URL de téléchargement du .docx produit par le backend. */
-  fichier: string;
-  onAnnexe: (etape: number) => void;
-}) {
-  const passages = blocs.filter((b) => b.type === "revoir").length;
+function ProjetActe({ acte, onAnnexe }: { acte: ActeProduit; onAnnexe: (etape: number) => void }) {
+  const passages = acte.blocs.filter((b) => b.type === "revoir").length;
   const [courant, setCourant] = useState(0);
   const refs = useRef<(HTMLDivElement | null)[]>([]);
   const annexes = useRef<HTMLDivElement>(null);
@@ -302,7 +263,7 @@ function ProjetActe({
       <div className="passages">
         <span className="passages__compte">
           <span className="passages__pastille" />
-          {passages} passages à revoir
+          {passages} passage{passages > 1 ? "s" : ""} à revoir
         </span>
         <span className="passages__nav">
           <span className="passages__position">
@@ -315,9 +276,9 @@ function ProjetActe({
             <Icon nom="chev-d-nav" />
           </button>
           <span className="passages__trait" />
-          {fichier && (
+          {acte.fichier && (
             <>
-              <a className="lien-accent lien-accent--moyen" href={fichier} download>
+              <a className="lien-accent lien-accent--moyen" href={acte.fichier} download>
                 Télécharger le .docx
               </a>
               <span className="passages__trait" />
@@ -334,11 +295,7 @@ function ProjetActe({
       </div>
 
       <article className="acte">
-        <h3 className="acte__titre">CHARTE DE VIE COMMUNE</h3>
-        <p className="acte__parties">Sarah Benoit et David Morin</p>
-        <p className="acte__meta">Projet du 16 octobre 2026, dossier 2026-0644</p>
-
-        {blocs.map((b, i) => {
+        {acte.blocs.map((b, i) => {
           if (b.type === "titre") return <h4 key={i} className="acte__intertitre">{b.texte}</h4>;
           if (b.type === "texte")
             return (
@@ -364,7 +321,7 @@ function ProjetActe({
           );
         })}
 
-        <h4 className="acte__intertitre">Annexes</h4>
+        <h4 className="acte__intertitre">Documents de travail</h4>
         <div className="annexes" ref={annexes}>
           {ANNEXES.map((a) => (
             <button key={a.libelle} type="button" className="annexes__ligne" onClick={() => onAnnexe(a.etape)}>
@@ -378,12 +335,14 @@ function ProjetActe({
   );
 }
 
-// Appels au backend (étapes 2 à 8)
+// Appels au backend
 
-type Appel = { enCours: boolean; erreur: string };
+/** `debut` : heure de lancement de l'appel en cours, pour afficher le temps écoulé. */
+type Appel = { enCours: boolean; erreur: string; debut?: number };
 const REPOS: Appel = { enCours: false, erreur: "" };
-type CleAppel = "articles" | "faits" | "contradictions" | "consequences" | "acte";
+type CleAppel = "synthese" | "articles" | "faits" | "contradictions" | "consequences" | "acte";
 const AUCUN_APPEL: Record<CleAppel, Appel> = {
+  synthese: REPOS,
   articles: REPOS,
   faits: REPOS,
   contradictions: REPOS,
@@ -391,19 +350,28 @@ const AUCUN_APPEL: Record<CleAppel, Appel> = {
   acte: REPOS,
 };
 
-function versElements(liste: api.ElementBackend[]): Element[] {
-  return liste.map((e): Element => ({ ...e, etat: e.a_confirmer ? "attente" : "coche" }));
-}
-
-/** Pendant l'appel, un message d'attente ; ensuite le contenu, précédé de l'erreur s'il y en a une. */
-function Chargement({ appel, attente, children }: { appel: Appel; attente: string; children: ReactNode }) {
-  if (appel.enCours) return <p className="grille__vide">{attente}</p>;
+/** Pendant l'appel, un message d'attente ; en cas d'échec, l'erreur et « Réessayer » ; sinon le contenu. */
+function Chargement({
+  appel,
+  attente,
+  onReessayer,
+  children,
+}: {
+  appel: Appel;
+  attente: string;
+  onReessayer: () => void;
+  children: ReactNode;
+}) {
+  if (appel.enCours) return <Attente message={attente} debut={appel.debut} />;
   return (
     <>
       {appel.erreur && (
-        <p className="zone-texte__erreur">
-          Le backend n’a pas pu générer cette étape ({appel.erreur}). Contenu de démonstration affiché.
-        </p>
+        <div className="echec">
+          <p>Le backend n’a pas pu générer cette étape : {appel.erreur}</p>
+          <button type="button" className="lien-accent" onClick={onReessayer}>
+            Réessayer
+          </button>
+        </div>
       )}
       {children}
     </>
@@ -412,33 +380,50 @@ function Chargement({ appel, attente, children }: { appel: Appel; attente: strin
 
 // Écran
 
-export function Pipeline({ onQuitter, onTerminer }: { onQuitter: () => void; onTerminer: () => void }) {
+export function Pipeline({
+  mandat,
+  source,
+  onQuitter,
+  onTerminer,
+  onAjouterPieces,
+}: {
+  mandat: Mandat;
+  source: Source;
+  onQuitter: () => void;
+  /** Téléverse des pièces dans le dossier (absent pour le mandat d'exemple). */
+  onAjouterPieces?: (fichiers: File[]) => Promise<void>;
+  /** « Enregistrer l'acte » : l'acte produit et les noms des clients trouvés à l'étape 1. */
+  onTerminer: (acte: ActeProduit, titre: string) => void;
+}) {
   const [actif, setActif] = useState(1);
   const [atteinte, setAtteinte] = useState(1);
   const [augure, setAugure] = useState(false);
-  const [syntdmd, setSyntdmd] = useState(() => versTexte(SYNTHESE_DEMANDE));
-  const [articles, setArticles] = useState(ARTICLES);
-  const [syntheseArticles, setSyntheseArticles] = useState(SYNTHESE_ARTICLES);
-  const [faits, setFaits] = useState(FAITS);
-  const [demandes, setDemandes] = useState(DEMANDES);
-  const [consequences, setConsequences] = useState(CONSEQUENCES);
+  const [titre, setTitre] = useState(mandat.titre);
+  const [syntdmd, setSyntdmd] = useState("");
+  const [articles, setArticles] = useState<Element[]>([]);
+  const [syntheseArticles, setSyntheseArticles] = useState<Paragraphe[]>([]);
+  const [faits, setFaits] = useState<Element[]>([]);
+  const [demandes, setDemandes] = useState<Element[]>([]);
+  const [contradictions, setContradictions] = useState<Paragraphe[]>([]);
+  const [contradictionsBrutes, setContradictionsBrutes] = useState<unknown[]>([]);
+  const [consequences, setConsequences] = useState<Element[]>([]);
+  const [risques, setRisques] = useState<Paragraphe[]>([]);
+  const [acte, setActe] = useState<ActeProduit | null>(null);
   // Sens du dernier changement d'étape ; nul à l'arrivée, pour ne pas animer en plus de la transition d'écran.
   const [sens, setSens] = useState<"avant" | "arriere" | null>(null);
-  const [contradictions, setContradictions] = useState(CONTRADICTIONS);
-  const [contradictionsBrutes, setContradictionsBrutes] = useState<unknown[]>([]);
-  const [risques, setRisques] = useState(SYNTHESE_RISQUES);
-  const [blocsActe, setBlocsActe] = useState<BlocActe[]>(ACTE);
-  const [fichierActe, setFichierActe] = useState("");
   const [appels, setAppels] = useState(AUCUN_APPEL);
-  // Entrées du dernier appel réussi : on ne relance pas un appel de plusieurs minutes pour rien.
+  // Entrées du dernier appel réussi ou en cours : on ne relance pas un appel de plusieurs minutes pour rien.
   const derniers = useRef<Partial<Record<CleAppel, string>>>({});
   const contenu = useRef<HTMLDivElement>(null);
 
   const etape = ETAPES[actif - 1];
   const generes = ETAPES.slice(0, atteinte).map((e) => ({ numero: `G${e.numero}`, titre: e.document }));
+  const mandatAffiche = { ...mandat, titre };
   // Les étapes 1, 3, 5 et 7 lancent un appel : pas de nouvel appel tant qu'un autre est en cours,
   // ce qui garantit aussi que chaque appel part des résultats de l'étape précédente.
   const bloque = [1, 3, 5, 7].includes(actif) && Object.values(appels).some((a) => a.enCours);
+  const contexte = [`Mandat : ${titreMandat(mandatAffiche)}. Étape en cours : ${etape.titre}.`, syntdmd].join("\n");
+  const demander = (question: string) => source.question(question, [], contexte);
 
   function aller(n: number) {
     setSens(n < actif ? "arriere" : "avant");
@@ -447,23 +432,24 @@ export function Pipeline({ onQuitter, onTerminer }: { onQuitter: () => void; onT
     contenu.current?.scrollTo({ top: 0 });
   }
 
-  async function lancer(cle: CleAppel, entrees: unknown, appel: () => Promise<void>) {
+  async function lancer(cle: CleAppel, entrees: unknown, appel: () => Promise<void>, forcer = false) {
     const signature = JSON.stringify(entrees);
-    if (derniers.current[cle] === signature) return;
-    setAppels((a) => ({ ...a, [cle]: { enCours: true, erreur: "" } }));
+    if (!forcer && derniers.current[cle] === signature) return;
+    derniers.current[cle] = signature;
+    setAppels((a) => ({ ...a, [cle]: { enCours: true, erreur: "", debut: Date.now() } }));
     try {
       await appel();
-      derniers.current[cle] = signature;
       setAppels((a) => ({ ...a, [cle]: REPOS }));
     } catch (e) {
+      delete derniers.current[cle];
       setAppels((a) => ({ ...a, [cle]: { enCours: false, erreur: e instanceof Error ? e.message : String(e) } }));
     }
   }
 
   /** Ce que le notaire a retenu aux étapes 1 à 5. */
-  function valide(): api.Valide {
+  function valide(): Valide {
     return {
-      dossier: DOSSIER_FICTIF,
+      dossier: mandat.dossier,
       syntdmd,
       articles: articles.filter((a) => a.etat === "coche"),
       synthese_droit: versTexte(syntheseArticles),
@@ -472,60 +458,108 @@ export function Pipeline({ onQuitter, onTerminer }: { onQuitter: () => void; onT
     };
   }
 
-  function confirmer() {
-    if (actif === 1)
-      lancer("articles", syntdmd, async () => {
-        const r = await api.syntheseDemandeClients(DOSSIER_FICTIF, syntdmd);
-        setArticles(versElements(r.articles));
-        setSyntheseArticles(versParagraphes(r.synthese));
-      });
-    if (actif === 3) {
+  const appelsEtapes = {
+    synthese: (forcer = false) =>
+      lancer(
+        "synthese",
+        mandat.dossier,
+        async () => {
+          const r = await source.syntheseDemande();
+          setSyntdmd(r.synthese);
+          if (r.titre) setTitre(r.titre);
+        },
+        forcer,
+      ),
+    articles: (forcer = false) =>
+      lancer(
+        "articles",
+        syntdmd,
+        async () => {
+          const r = await source.articles(syntdmd);
+          setArticles(r.articles);
+          setSyntheseArticles(versParagraphes(r.synthese));
+        },
+        forcer,
+      ),
+    faits: (forcer = false) => {
       const retenus = articles.filter((a) => a.etat === "coche");
-      lancer("faits", [syntdmd, retenus], async () => {
-        const r = await api.demandesEtFaits(DOSSIER_FICTIF, syntdmd, retenus);
-        setFaits(versElements(r.faits));
-        setDemandes(versElements(r.demandes));
-      });
-    }
-    if (actif === 5) {
-      // Contradictions et conséquences ne dépendent que des étapes 1 à 5 : en parallèle.
+      return lancer(
+        "faits",
+        [syntdmd, retenus],
+        async () => {
+          const r = await source.faitsEtDemandes(syntdmd, retenus);
+          setFaits(r.faits);
+          setDemandes(r.demandes);
+        },
+        forcer,
+      );
+    },
+    // Contradictions et conséquences ne dépendent que des étapes 1 à 5 : en parallèle.
+    contradictions: (forcer = false) => {
       const v = valide();
-      lancer("contradictions", v, async () => {
-        const r = await api.contradictions(v);
-        setContradictions(r.paragraphes);
-        setContradictionsBrutes(r.contradictions);
-      });
-      lancer("consequences", v, async () => {
-        const r = await api.consequences(v);
-        setConsequences(versElements(r.consequences));
-        setRisques(r.risques);
-      });
-    }
-    if (actif === 7) {
+      return lancer(
+        "contradictions",
+        v,
+        async () => {
+          const r = await source.contradictions(v);
+          setContradictions(r.paragraphes);
+          setContradictionsBrutes(r.brutes);
+        },
+        forcer,
+      );
+    },
+    consequences: (forcer = false) => {
+      const v = valide();
+      return lancer(
+        "consequences",
+        v,
+        async () => {
+          const r = await source.consequences(v);
+          setConsequences(r.consequences);
+          setRisques(r.risques);
+        },
+        forcer,
+      );
+    },
+    acte: (forcer = false) => {
       const v = {
         ...valide(),
         contradictions: contradictionsBrutes,
         consequences: consequences.filter((c) => c.etat === "coche"),
       };
-      lancer("acte", v, async () => {
-        const r = await api.acte(v);
-        setBlocsActe(r.blocs);
-        setFichierActe(r.fichier);
-      });
+      return lancer("acte", v, async () => setActe(await source.acte(v)), forcer);
+    },
+  };
+
+  // Étape 1 : la synthèse de la demande est générée à l'arrivée.
+  useEffect(() => {
+    appelsEtapes.synthese();
+    // Un seul appel par dossier ; `lancer` ignore le second montage du mode strict.
+  }, [mandat.dossier]);
+
+  function confirmer() {
+    if (actif === 1) appelsEtapes.articles();
+    if (actif === 3) appelsEtapes.faits();
+    if (actif === 5) {
+      appelsEtapes.contradictions();
+      appelsEtapes.consequences();
     }
+    if (actif === 7) appelsEtapes.acte();
     aller(actif + 1);
   }
 
-  const contexte = [`Mandat : ${TITRE_MANDAT}. Étape en cours : ${etape.titre}.`, syntdmd].join("\n");
+  const reessayer = (cle: CleAppel) => () => appelsEtapes[cle](true);
 
   return (
     <div className="espace">
-      <BarreSuperieure onRetour={onQuitter} onBasculeAugure={() => setAugure(!augure)} />
+      <BarreSuperieure titre={titreMandat(mandatAffiche)} onRetour={onQuitter} onBasculeAugure={() => setAugure(!augure)} />
       <div className="zones">
         <Arborescence
+          mandat={mandat}
           generes={generes}
           selection={`G${actif}`}
           onSelection={(numero) => aller(Number(numero.slice(1)))}
+          onAjouterPieces={onAjouterPieces}
         />
 
         <section className="milieu">
@@ -539,46 +573,79 @@ export function Pipeline({ onQuitter, onTerminer }: { onQuitter: () => void; onT
             <h2 className="milieu__titre">{etape.titre}</h2>
 
             {actif === 1 && (
-              <ZoneTexte
-                initial={versParagraphes(syntdmd)}
-                consigne="Rédige la synthèse de la demande des clients, à partir des pièces du dossier."
-                onTexte={setSyntdmd}
-              />
+              <Chargement
+                appel={appels.synthese}
+                attente="Augure lit les pièces du dossier et résume la demande (quelques minutes)…"
+                onReessayer={reessayer("synthese")}
+              >
+                <ZoneTexte
+                  initial={versParagraphes(syntdmd)}
+                  consigne="Rédige la synthèse de la demande des clients, à partir des pièces du dossier."
+                  demander={demander}
+                  onTexte={setSyntdmd}
+                />
+              </Chargement>
             )}
             {actif === 2 && (
-              <Chargement appel={appels.articles} attente="Le Compagnon cherche les articles, puis Augure retient ceux qui s’appliquent (quelques minutes)…">
+              <Chargement
+                appel={appels.articles}
+                attente="Le Compagnon cherche les articles, puis Augure retient ceux qui s’appliquent (quelques minutes)…"
+                onReessayer={reessayer("articles")}
+              >
                 <ListeACocher elements={articles} onChange={setArticles} />
               </Chargement>
             )}
             {actif === 3 && (
-              <Chargement appel={appels.articles} attente="Augure rédige la synthèse des articles (quelques minutes)…">
+              <Chargement
+                appel={appels.articles}
+                attente="Augure rédige la synthèse des articles (quelques minutes)…"
+                onReessayer={reessayer("articles")}
+              >
                 <ZoneTexte
                   initial={syntheseArticles}
-                  consigne="Rédige la synthèse juridique des articles retenus et de leurs effets pour ce couple."
+                  consigne="Rédige la synthèse juridique des articles retenus et de leurs effets pour les clients."
+                  demander={demander}
                   onTexte={(t) => setSyntheseArticles(versParagraphes(t))}
                 />
               </Chargement>
             )}
             {actif === 4 && (
-              <Chargement appel={appels.faits} attente="Augure relève les éléments factuels du dossier (quelques minutes)…">
+              <Chargement
+                appel={appels.faits}
+                attente="Augure relève les éléments factuels du dossier (quelques minutes)…"
+                onReessayer={reessayer("faits")}
+              >
                 <ListeACocher elements={faits} onChange={setFaits} />
               </Chargement>
             )}
             {actif === 5 && (
-              <Chargement appel={appels.faits} attente="Augure dresse la liste des demandes des clients (quelques minutes)…">
+              <Chargement
+                appel={appels.faits}
+                attente="Augure dresse la liste des demandes des clients (quelques minutes)…"
+                onReessayer={reessayer("faits")}
+              >
                 <ListeACocher elements={demandes} onChange={setDemandes} troisEtats />
               </Chargement>
             )}
             {actif === 6 && (
-              <Chargement appel={appels.contradictions} attente="Augure relève les contradictions (quelques minutes)…">
+              <Chargement
+                appel={appels.contradictions}
+                attente="Augure relève les contradictions (quelques minutes)…"
+                onReessayer={reessayer("contradictions")}
+              >
                 <ZoneTexte
                   initial={contradictions}
                   consigne="Relève les contradictions entre les pièces du dossier, en citant chaque pièce."
+                  demander={demander}
                 />
               </Chargement>
             )}
             {actif === 7 && (
-              <Chargement appel={appels.consequences} attente="Augure relève les conséquences possibles (quelques minutes)…">
+              <Chargement
+                appel={appels.consequences}
+                attente="Augure relève les conséquences possibles (quelques minutes)…"
+                onReessayer={reessayer("consequences")}
+              >
                 <div className="pile">
                   <ListeACocher elements={consequences} onChange={setConsequences} />
                   <ZoneTexte
@@ -586,13 +653,18 @@ export function Pipeline({ onQuitter, onTerminer }: { onQuitter: () => void; onT
                     titre="Synthèse des risques"
                     enTete="crayon"
                     consigne="Rédige la synthèse des risques juridiques et relationnels de ce mandat."
+                    demander={demander}
                   />
                 </div>
               </Chargement>
             )}
             {actif === 8 && (
-              <Chargement appel={appels.acte} attente="Augure complète le modèle d’acte, puis le backend produit le Word annoté (quelques minutes)…">
-                <ProjetActe blocs={blocsActe} fichier={fichierActe} onAnnexe={aller} />
+              <Chargement
+                appel={appels.acte}
+                attente="Augure complète le modèle d’acte, puis le backend produit le Word annoté (quelques minutes)…"
+                onReessayer={reessayer("acte")}
+              >
+                {acte && <ProjetActe acte={acte} onAnnexe={aller} />}
               </Chargement>
             )}
           </div>
@@ -606,13 +678,18 @@ export function Pipeline({ onQuitter, onTerminer }: { onQuitter: () => void; onT
             {actif < 8 ? (
               <BoutonSuivant libelle={`Confirmer et passer à l’étape ${actif + 1}`} onClick={confirmer} disabled={bloque} />
             ) : (
-              <BoutonSuivant libelle="Enregistrer l’acte" onClick={onTerminer} />
+              <BoutonSuivant libelle="Enregistrer l’acte" onClick={() => acte && onTerminer(acte, titre)} disabled={!acte} />
             )}
           </footer>
         </section>
 
         {augure ? (
-          <PanneauAugure contexte={contexte} onFermer={() => setAugure(false)} />
+          <PanneauAugure
+            source={source}
+            contexte={contexte}
+            initiale={mandat.exemple ? CONVERSATION_DEMO : []}
+            onFermer={() => setAugure(false)}
+          />
         ) : (
           <RailAugure onOuvrir={() => setAugure(true)} />
         )}

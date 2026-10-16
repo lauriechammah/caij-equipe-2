@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { demanderAugure, type MessageAugure } from "../api/augure";
-import { CONVERSATION_DEMO, SUGGESTIONS, type Message } from "../data/mandat";
+import type { Source } from "../api/source";
+import type { Message } from "../data/types";
 import { Icon } from "./Icon";
+
+/** Questions proposées : valables pour tout dossier. */
+const SUGGESTIONS = ["Relever les contradictions", "Quelles informations manquent ?", "Questions à poser au client"];
 
 /** Rend le **gras** Markdown renvoyé par Augure. */
 function enLigne(ligne: string) {
@@ -13,28 +16,39 @@ function texteComplet(m: Extract<Message, { role: "assistant" }>) {
   return [m.texte, puces].filter(Boolean).join("\n");
 }
 
-/** Zone droite ouverte : conversation avec Augure AI. */
+/** Zone droite ouverte : conversation avec Augure AI sur le dossier en cours. */
 export function PanneauAugure({
+  source,
   contexte,
+  initiale = [],
   onFermer,
   onInserer,
 }: {
+  source: Source;
+  /** Où en est le notaire (étape, synthèse), joint à chaque question. */
   contexte: string;
+  /** Conversation de départ (le mandat d'exemple en a une). */
+  initiale?: Message[];
   onFermer: () => void;
   onInserer?: (texte: string) => void;
 }) {
-  const [messages, setMessages] = useState<Message[]>(CONVERSATION_DEMO);
+  const [messages, setMessages] = useState<Message[]>(initiale);
   const [saisie, setSaisie] = useState("");
   const [occupe, setOccupe] = useState(false);
   const [copie, setCopie] = useState<number | null>(null);
   const finRef = useRef<HTMLDivElement>(null);
-  const annulation = useRef<AbortController | null>(null);
+  const monte = useRef(true);
 
   useEffect(() => {
     finRef.current?.scrollIntoView({ block: "end" });
   }, [messages]);
 
-  useEffect(() => () => annulation.current?.abort(), []);
+  useEffect(() => {
+    monte.current = true;
+    return () => {
+      monte.current = false;
+    };
+  }, []);
 
   async function envoyer(question: string) {
     const q = question.trim();
@@ -42,30 +56,22 @@ export function PanneauAugure({
     setSaisie("");
     setOccupe(true);
 
-    const historique: MessageAugure[] = [...messages, { role: "user", texte: q } as Message].map((m) => ({
-      role: m.role,
-      content: m.role === "assistant" ? texteComplet(m) : m.texte,
-    }));
+    const historique = messages;
     setMessages((ms) => [...ms, { role: "user", texte: q }, { role: "assistant", texte: "", enCours: true }]);
+    const remplacerDernier = (m: Message) => monte.current && setMessages((ms) => [...ms.slice(0, -1), m]);
 
-    const remplacerDernier = (m: Message) => setMessages((ms) => [...ms.slice(0, -1), m]);
-    annulation.current = new AbortController();
     try {
-      const texte = await demanderAugure(
-        historique,
-        contexte,
-        (partiel) => remplacerDernier({ role: "assistant", texte: partiel, enCours: true }),
-        annulation.current.signal,
+      const texte = await source.question(q, historique, contexte, (partiel) =>
+        remplacerDernier({ role: "assistant", texte: partiel, enCours: true }),
       );
       remplacerDernier({ role: "assistant", texte: texte || "Augure n’a pas renvoyé de réponse." });
     } catch (e) {
-      if ((e as Error).name === "AbortError") return;
       remplacerDernier({
         role: "assistant",
-        texte: "Augure est injoignable. Vérifiez AUGURE_API_KEY dans .env, puis relancez npm run dev.",
+        texte: `Augure est injoignable (${e instanceof Error ? e.message : String(e)}).`,
       });
     } finally {
-      setOccupe(false);
+      if (monte.current) setOccupe(false);
     }
   }
 
@@ -106,6 +112,12 @@ export function PanneauAugure({
       </div>
 
       <div className="augure__conversation">
+        {messages.length === 0 && (
+          <p className="augure__accueil">
+            Posez une question sur ce dossier : Augure lit les pièces avant de répondre, et cite celles sur
+            lesquelles il s’appuie.
+          </p>
+        )}
         {messages.map((m, i) =>
           m.role === "user" ? (
             <div key={i} className="question">
@@ -120,7 +132,7 @@ export function PanneauAugure({
               {m.texte ? (
                 m.texte.split(/\n+/).map((ligne, j) => <p key={j}>{enLigne(ligne)}</p>)
               ) : (
-                <p className="reponse__attente">Augure réfléchit…</p>
+                <p className="reponse__attente">Augure lit le dossier…</p>
               )}
               {m.puces?.map((p) => (
                 <div key={p.amorce} className="reponse__puce">

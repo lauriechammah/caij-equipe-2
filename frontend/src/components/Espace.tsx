@@ -1,10 +1,26 @@
 import { useState, type ReactNode } from "react";
-import { MODELE, PIECES, TITRE_MANDAT, type Fichier } from "../data/mandat";
+import type { Fichier, Mandat } from "../data/types";
 import { Badge } from "./Base";
 import { Icon, type NomIcone } from "./Icon";
+import { useAjoutPieces } from "./Televersement";
+
+/** « Benoit / Morin, charte de vie commune » ; le type d'acte seul tant que les clients sont inconnus. */
+export function titreMandat(mandat: Mandat) {
+  return mandat.titre && mandat.titre !== mandat.typeActe
+    ? `${mandat.titre}, ${mandat.typeActe.charAt(0).toLowerCase()}${mandat.typeActe.slice(1)}`
+    : mandat.typeActe;
+}
 
 /** Barre supérieure de l'espace de travail. */
-export function BarreSuperieure({ onRetour, onBasculeAugure }: { onRetour: () => void; onBasculeAugure: () => void }) {
+export function BarreSuperieure({
+  titre,
+  onRetour,
+  onBasculeAugure,
+}: {
+  titre: string;
+  onRetour: () => void;
+  onBasculeAugure: () => void;
+}) {
   return (
     <header className="barre">
       <div className="barre__gauche">
@@ -13,7 +29,7 @@ export function BarreSuperieure({ onRetour, onBasculeAugure }: { onRetour: () =>
           Mandats
         </button>
         <span className="barre__separateur" />
-        <h1 className="barre__titre">{TITRE_MANDAT}</h1>
+        <h1 className="barre__titre">{titre}</h1>
       </div>
       <button type="button" className="bascule-augure" onClick={onBasculeAugure}>
         <Icon nom="sparkle-bascule" />
@@ -78,35 +94,40 @@ export function Arborescence({
   selection,
   onSelection,
   variante = "pipeline",
+  mandat,
+  onAjouterPieces,
 }: {
+  mandat: Mandat;
   generes: Fichier[];
   selection?: string;
   onSelection?: (numero: string) => void;
   variante?: "pipeline" | "editeur";
+  /** Téléverse des pièces dans le dossier (absent pour le mandat d'exemple). */
+  onAjouterPieces?: (fichiers: File[]) => Promise<void>;
 }) {
+  const ajout = useAjoutPieces(onAjouterPieces);
   return (
     <aside className="arbo">
       <div className="arbo__entete">
         <h2>Dossier</h2>
         {variante === "pipeline" ? (
-          <button type="button" className="lien-accent">
-            + Ajouter
-          </button>
+          ajout.bouton("lien-accent", "+ Ajouter")
         ) : (
           <button type="button" className="arbo__plus" aria-label="Plus d’options">
             <Icon nom="more" />
           </button>
         )}
       </div>
+      {ajout.message}
 
-      <Groupe libelle="PIÈCES DU DOSSIER" icone="folder-arbo" nombre={PIECES.length}>
-        {PIECES.map((p) => (
-          <ElementFichier key={p.numero} fichier={p} />
+      <Groupe libelle="PIÈCES DU DOSSIER" icone="folder-arbo" nombre={mandat.pieces.length}>
+        {mandat.pieces.map((p) => (
+          <ElementFichier key={`${p.numero}-${p.titre}`} fichier={p} />
         ))}
       </Groupe>
 
-      <Groupe libelle="MODÈLE" icone="folder-arbo" nombre={1}>
-        <ElementFichier fichier={MODELE} />
+      <Groupe libelle="MODÈLE" icone="folder-arbo" nombre={mandat.modele ? 1 : 0}>
+        {mandat.modele && <ElementFichier fichier={mandat.modele} />}
       </Groupe>
 
       <div className="arbo__trait" />
@@ -122,13 +143,16 @@ export function Arborescence({
         ))}
       </Groupe>
 
-      {variante === "editeur" && (
+      {variante === "editeur" && onAjouterPieces && (
         <>
           <div className="arbo__espace" />
-          <button type="button" className="arbo__ajouter">
-            <Icon nom="plus" />
-            Ajouter des pièces
-          </button>
+          {ajout.bouton(
+            "arbo__ajouter",
+            <>
+              <Icon nom="plus" />
+              Ajouter des pièces
+            </>,
+          )}
         </>
       )}
     </aside>

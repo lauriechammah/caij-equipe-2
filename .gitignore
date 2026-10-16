@@ -11,6 +11,8 @@ venv/
 
 # Node (au cas où)
 node_modules/
+dist/
+.vite/
 
 # Fichiers temporaires Word / Office
 ~$*
@@ -28,4 +30,4 @@ Thumbs.db
 .claude/settings.local.json
 
 # Base SQLite des documents (python -m backend.db la recrée à partir de docs/)
-data/
+/data/

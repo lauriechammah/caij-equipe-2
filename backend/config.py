@@ -19,6 +19,17 @@ MAX_TOKENS_AUGURE = 64000
 TYPES_COMPAGNON = ["legislation", "jurisprudence", "doctrine"]
 TOP_K_COMPAGNON = 10
 EXTRACT_COMPAGNON = 1500
+# Le serveur garde la réponse de chaque étape : une requête identique (même dossier, mêmes
+# choix du notaire) est servie depuis data/documents.db sans rappeler Augure ni le Compagnon.
+# python -m backend.db --vider-cache pour l'oublier.
+CACHE_REPONSES = True
+# Enregistrement d'une démo : une requête jamais vue reçoit la dernière réponse calculée pour
+# la même étape du même dossier, même si le notaire a changé une case. Instantané, mais la
+# réponse ne reflète plus ses choix : à n'activer que pour enregistrer la démo.
+CACHE_DEMO = False
+# Démo : nombre maximal d'articles législatifs retenus aux étapes 2-3 (synthesedemandeclients).
+# Un seul article raccourcit nettement l'étape ; None pour garder tous ceux du Compagnon.
+ARTICLES_MAX = 1
 REPETITIONS = 3
 PAUSE_REPETITION = 5.0
 

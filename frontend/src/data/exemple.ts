@@ -1,32 +1,10 @@
-// Contenu de démonstration repris des maquettes Figma (dossier Benoit / Morin).
+// Le mandat d'exemple : contenu fixe repris des maquettes Figma (Benoit / Morin).
+// C'est le seul contenu écrit en dur dans le frontend ; il sert de démonstration sans backend.
+// Les vrais dossiers viennent du backend (api/backend.ts).
 
-export type Statut = "En cours" | "Terminé";
+import type { BlocActe, Element, Fichier, Mandat, Message, Paragraphe } from "./types";
 
-export type Mandat = {
-  dossier: string;
-  client: string;
-  type: string;
-  meta: string;
-  statut: Statut;
-};
-
-export const MANDATS: Mandat[] = [
-  { dossier: "2026-0644", client: "Benoit / Morin", type: "Charte de vie commune", meta: "Aujourd’hui, 11 h 40", statut: "En cours" },
-  { dossier: "2026-0631", client: "Tremblay", type: "Testament notarié", meta: "2 oct 2026", statut: "Terminé" },
-  { dossier: "2026-0618", client: "Gagnon / Roy", type: "Vente d’immeuble", meta: "24 sept 2026", statut: "Terminé" },
-  { dossier: "2026-0602", client: "Lavoie", type: "Mandat de protection", meta: "15 sept 2026", statut: "Terminé" },
-  { dossier: "2026-0587", client: "Côté / Bouchard", type: "Contrat de mariage", meta: "3 sept 2026", statut: "Terminé" },
-  { dossier: "2026-0570", client: "Pelletier", type: "Donation entre vifs", meta: "21 août 2026", statut: "Terminé" },
-];
-
-export const TITRE_MANDAT = "Benoit / Morin, charte de vie commune";
-/** Dossier dont le backend lit les pièces (docs/dossiers_fictifs/<nom>/txt). */
-export const DOSSIER_FICTIF = "charte_vie_commune";
-export const CHEMIN_DOSSIER = "Documents › Dossiers › 2026-0644 Benoit-Morin";
-
-export type Fichier = { numero: string; titre: string };
-
-export const PIECES: Fichier[] = [
+const PIECES: Fichier[] = [
   { numero: "0", titre: "Mise en contexte et mandat" },
   { numero: "1", titre: "Notes d’entrevue de la notaire, 5 octobre 2026" },
   { numero: "2", titre: "Questionnaire rempli par Sarah Benoit" },
@@ -34,41 +12,20 @@ export const PIECES: Fichier[] = [
   { numero: "4", titre: "Courriel de Sarah Benoit, 16 octobre 2026" },
 ];
 
-export const MODELE: Fichier = { numero: "M", titre: "Modèle de charte de vie commune" };
+const MODELE: Fichier = { numero: "M", titre: "Modèle de charte de vie commune" };
 
-export const TYPES_ACTE = [
-  "Charte de vie commune",
-  "Vente d’un immeuble au comptant",
-  "Servitude de passage en cas d’enclave",
-  "Convention d’indivision",
-  "Mandat de protection",
-  "Testament simple avec fiducie pour enfants",
-];
-
-/** Paragraphe avec, au besoin, une amorce en gras (« Union parentale : … »). */
-export type Paragraphe = { amorce?: string; texte: string };
-
-/** « coche » / « decoche » / « attente » (à confirmer avec le client). */
-export type EtatCase = "coche" | "decoche" | "attente";
-export type Element = { titre: string; source: string; etat: EtatCase };
-
-export type Etape = {
-  numero: number;
-  libelle: string;
-  titre: string;
-  document: string;
+export const EXEMPLE: Mandat = {
+  dossier: "exemple",
+  titre: "Benoit / Morin",
+  typeActe: "Charte de vie commune",
+  reference: "Famille, Doc. 11.1",
+  modeleActe: "charte_vie_commune",
+  pieces: PIECES,
+  modele: MODELE,
+  modeleWord: true,
+  actes: [],
+  exemple: true,
 };
-
-export const ETAPES: Etape[] = [
-  { numero: 1, libelle: "Demande", titre: "Synthèse de la demande client", document: "Synthèse de la demande" },
-  { numero: 2, libelle: "Articles", titre: "Articles soulevés", document: "Articles retenus" },
-  { numero: 3, libelle: "Synthèse juridique", titre: "Synthèse des articles", document: "Synthèse des articles" },
-  { numero: 4, libelle: "Faits", titre: "Éléments factuels", document: "Éléments factuels" },
-  { numero: 5, libelle: "Demandes", titre: "Demandes des clients", document: "Demandes des clients" },
-  { numero: 6, libelle: "Contradictions", titre: "Contradictions soulevées", document: "Contradictions" },
-  { numero: 7, libelle: "Conséquences", titre: "Conséquences possibles", document: "Conséquences et risques" },
-  { numero: 8, libelle: "Acte", titre: "Projet d’acte", document: "Projet d’acte" },
-];
 
 export const SYNTHESE_DEMANDE: Paragraphe[] = [
   { texte: "Sarah Benoit (34 ans, médecin en fin de résidence en médecine d’urgence) et David Morin (36 ans, ébéniste à son compte depuis 2018) font vie commune depuis le 1er juillet 2021 au 77, rue des Remparts-Sud, à Lévis, dans une maison qui appartient à Sarah seule. Ils n’ont jamais été mariés et n’ont aucun contrat de vie commune. Leur premier enfant doit naître en mars 2027." },
@@ -143,13 +100,9 @@ export const SYNTHESE_RISQUES: Paragraphe[] = [
   { amorce: "Risque relationnel :", texte: "les demandes du courriel n’ont pas été discutées avec David : les présenter comme rédigées par la notaire compromettrait son impartialité." },
 ];
 
-/** Bloc de l'acte : intertitre, paragraphe, ou passage surligné « à revoir ». */
-export type BlocActe =
-  | { type: "titre"; texte: string }
-  | { type: "texte"; texte: string }
-  | { type: "revoir"; texte: string; note: string };
-
 export const ACTE: BlocActe[] = [
+  { type: "titre", texte: "CHARTE DE VIE COMMUNE" },
+  { type: "texte", texte: "Sarah Benoit et David Morin. Projet du 16 octobre 2026, dossier 2026-0644." },
   { type: "titre", texte: "Préambule" },
   { type: "texte", texte: "Nous, Sarah Benoit, médecin, et David Morin, ébéniste, faisons vie commune depuis le 1er juillet 2021 à Lévis et attendons notre premier enfant en mars 2027. Cette charte exprime nos valeurs et nos intentions ; elle n’a pas la portée d’un contrat." },
   { type: "titre", texte: "Nos valeurs" },
@@ -166,57 +119,6 @@ export const ACTE: BlocActe[] = [
   { type: "titre", texte: "Nos projets" },
   { type: "revoir", texte: "Sarah envisage une formation complémentaire à Toronto en 2028-2029 ; nous en discuterons ensemble.", note: "À revoir : David refuse de déménager (pièce 3) ; demande d’engagement exclue à l’étape 5" },
 ];
-
-/** Annexes de l'acte : libellé et étape d'origine. */
-export const ANNEXES: { libelle: string; etape: number }[] = [
-  { libelle: "Synthèse de la demande", etape: 1 },
-  { libelle: "Articles retenus", etape: 2 },
-  { libelle: "Synthèse des articles", etape: 3 },
-  { libelle: "Éléments factuels", etape: 4 },
-  { libelle: "Demandes des clients", etape: 5 },
-  { libelle: "Contradictions soulevées", etape: 6 },
-  { libelle: "Conséquences et synthèse des risques", etape: 7 },
-];
-
-// Espace de travail (éditeur du projet de charte)
-
-export const DOCUMENTS_EDITEUR: Fichier[] = [
-  { numero: "G1", titre: "Projet de charte, v1" },
-  { numero: "G2", titre: "Synthèse des divergences entre les questionnaires" },
-];
-
-export type BlocCharte =
-  | { type: "titre"; texte: string }
-  | { type: "texte"; texte: string }
-  | { type: "discuter"; texte: string };
-
-export const CHARTE_V1: BlocCharte[] = [
-  { type: "titre", texte: "Préambule" },
-  { type: "texte", texte: "Nous, Sarah Benoit, médecin, née à Sherbrooke le 11 avril 1992, et David Morin, ébéniste, né à Lévis le 2 décembre 1989, faisons vie commune depuis le 1er juillet 2021 au 77, rue des Remparts-Sud, à Lévis. Nous attendons notre premier enfant, dont la naissance est prévue en mars 2027." },
-  { type: "texte", texte: "Par cette charte, nous voulons mettre par écrit notre vision de la vie à deux et de la famille que nous fondons. Elle exprime nos valeurs et nos intentions ; elle n’a pas la portée d’un contrat." },
-  { type: "titre", texte: "Nos valeurs" },
-  { type: "texte", texte: "Nous accordons une grande importance à la famille, à l’honnêteté et au soutien mutuel dans les moments difficiles. Sarah tient particulièrement à l’égalité et à l’autonomie de chacun ; David, à la loyauté et au plaisir d’être ensemble." },
-  { type: "titre", texte: "Notre vie de famille" },
-  { type: "texte", texte: "Nous tenons aux repas pris ensemble, sans écrans à table. Moka, notre labrador, fait partie de la famille." },
-  { type: "titre", texte: "Les enfants" },
-  { type: "discuter", texte: "Sarah souhaite un, peut-être deux enfants (pièce 2). David en souhaite trois ou quatre, rapprochés (pièce 3). Clause laissée ouverte pour la rencontre du 2 novembre." },
-  { type: "texte", texte: "Nous nous engageons à ne jamais recourir à la punition corporelle et à fixer à nos enfants des règles claires." },
-  { type: "titre", texte: "L’éducation" },
-  { type: "texte", texte: "Nous souhaitons que notre enfant fréquente l’école publique au primaire." },
-];
-
-// Augure AI
-
-export type Source = { numero: string; libelle: string };
-export type Message =
-  | { role: "user"; texte: string }
-  | {
-      role: "assistant";
-      texte: string;
-      puces?: { amorce: string; texte: string }[];
-      sources?: Source[];
-      enCours?: boolean;
-    };
 
 export const CONVERSATION_DEMO: Message[] = [
   { role: "user", texte: "Le courriel de Sarah du 16 octobre peut-il être intégré tel quel à la charte ?" },
@@ -235,5 +137,3 @@ export const CONVERSATION_DEMO: Message[] = [
     ],
   },
 ];
-
-export const SUGGESTIONS = ["Relever les divergences", "Comparer au modèle 11.1", "Reformuler la section 3"];

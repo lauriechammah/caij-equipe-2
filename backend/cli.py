@@ -20,6 +20,7 @@ from pathlib import Path
 from backend.acte import create_acte_modifie
 from backend.analyse import get_contradictions, get_type_consequences, resume_droit_applicable
 from backend.config import SORTIE
+from backend.journal import configurer
 from backend.llm import ErreurLLM, ask_augure, ask_compagnon
 
 ETATRE = """
@@ -50,6 +51,7 @@ def _pieces(dossier):
 
 
 def main():
+    configurer()
     parseur = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sous = parseur.add_subparsers(dest="commande", required=True)
 

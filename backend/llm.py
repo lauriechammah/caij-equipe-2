@@ -12,16 +12,19 @@
   renvoyés en entier, avec le titre et l'URL à citer.
 
 Les clients de ``scripts/`` sont repris tels quels : ce module ne fait que les
-appeler, formuler la demande, et nettoyer la réponse. Une source inventée
-disqualifie : rien n'est ajouté ici aux résultats du Compagnon.
+appeler, formuler la demande, et nettoyer la réponse. Seule la lecture du flux
+d'Augure est refaite ici (``_stream_chat``), pour mesurer chaque appel dans le journal.
+Une source inventée disqualifie : rien n'est ajouté ici aux résultats du Compagnon.
 """
 
 import importlib.util
 import json
 import re
+import sys
 import time
 from pathlib import Path
 
+from backend.clients import AugureError, lire_flux
 from backend.config import (
     EFFORT_AUGURE,
     EXTRACT_COMPAGNON,
@@ -32,6 +35,7 @@ from backend.config import (
     TOP_K_COMPAGNON,
     valeurs,
 )
+from backend.journal import SuiviAugure, chrono, journal, nombre
 
 CONSIGNE_JSON = (
     "Réponds uniquement par un objet JSON valide, sans texte avant ni après, "
@@ -83,10 +87,35 @@ def _appeler(fonction, *args, **kwargs):
         except SystemExit as arret:
             message = str(arret) or "échec sans message"
             if "429" in message and essai + 1 < REPETITIONS:
+                journal.warning("429, trop de requêtes : nouvel essai dans %.0f s (%d/%d)",
+                                PAUSE_REPETITION * (essai + 1), essai + 2, REPETITIONS)
                 time.sleep(PAUSE_REPETITION * (essai + 1))
                 continue
             raise ErreurLLM(message) from None
     raise ErreurLLM("échec après plusieurs tentatives")
+
+
+def _taille_contenu(contenu):
+    """« 9 parties, 84 512 car., 1 PDF (1.2 Mo en base64) » : ce qui part chez Augure, sans le texte."""
+    textes = [p.get("text") or "" for p in contenu if p.get("type") == "text"]
+    fichiers = [(p.get("file") or {}).get("file_data") or "" for p in contenu if p.get("type") == "file"]
+    taille = f"{len(contenu)} partie{'s' if len(contenu) > 1 else ''}, {nombre(sum(map(len, textes)))} car."
+    if fichiers:
+        taille += f", {len(fichiers)} PDF ({sum(map(len, fichiers)) / 1e6:.1f} Mo en base64)"
+    return taille
+
+
+def _stream_chat(cle, charge):
+    """``augure.stream_chat``, mesuré dans le journal ; une erreur reste un ``sys.exit`` pour ``_appeler``."""
+    with SuiviAugure(charge, _taille_contenu(charge["messages"][-1]["content"])) as suivi:
+        with augure.request("POST", "/chat/completions", cle, charge) as resp:
+            suivi.entetes()
+            try:
+                texte = lire_flux(resp, suivi)
+            except AugureError as erreur:
+                sys.exit(f"Erreur Augure : {erreur}")
+        suivi.recu(texte)
+    return texte
 
 
 def _sans_bloc(texte):
@@ -165,18 +194,23 @@ def ask_augure(prompt, dossier=None, modele=False, fichiers=(), sortie_json=True
             "model": reglages["model"],
             "messages": [{"role": "user", "content": contenu}],
             "stream": True,
+            # Jetons lus et produits dans le dernier événement, pour le journal.
+            "stream_options": {"include_usage": True},
             "reasoning_effort": reglages["effort"],
             "max_tokens": MAX_TOKENS_AUGURE,
         }
         if forcer_json:
             charge["response_format"] = {"type": "json_object"}
         try:
-            reponse = _appeler(augure.stream_chat, reglages["cle"], charge)
+            reponse = _appeler(_stream_chat, reglages["cle"], charge)
         except ErreurLLM as erreur:
             if forcer_json and essai == 0 and "response_format" in str(erreur):
+                journal.warning("Augure refuse response_format : nouvel appel sans")
                 forcer_json = False
                 continue
             if "reasoning_cutoff" in str(erreur) and reglages["effort"] != "low":
+                journal.warning("Augure a épuisé son budget de raisonnement (effort %s) : nouvel appel en effort low",
+                                reglages["effort"])
                 reglages["effort"] = "low"
                 continue
             raise
@@ -186,7 +220,10 @@ def ask_augure(prompt, dossier=None, modele=False, fichiers=(), sortie_json=True
         if donnees is not None:
             return donnees
         if essai == 0:
+            journal.warning("réponse d'Augure illisible en JSON (%s car.) : second appel complet",
+                            nombre(len(reponse)))
             contenu = contenu[:-1] + [{"type": "text", "text": f"{prompt}\n\n{CONSIGNE_JSON_RENOUVEL}"}]
+    journal.warning("toujours pas de JSON après deux appels : la réponse brute est renvoyée")
     return {"reponse_brute": reponse, "json": False}
 
 
@@ -197,16 +234,21 @@ def ask_compagnon(prompt, types=None, top_k=None, resume=True, clarifications=No
     Les extraits sont rendus en entier, avec le titre et l'URL à citer.
     """
     _regler_clients()
-    resultat = _appeler(
-        compagnon.search,
-        prompt,
-        list(types or TYPES_COMPAGNON),
-        int(top_k or TOP_K_COMPAGNON),
-        resume,
-        clarifications,
-    )
-    if not isinstance(resultat, dict):
-        resultat = {"results": resultat or {}}
+    types = list(types or TYPES_COMPAGNON)
+    # resume=True fait aussi analyser et résumer par le Compagnon : plus lent.
+    with chrono(f"Compagnon « {' '.join(prompt.split())[:60]} » ({', '.join(types)}, "
+                f"résumé {'oui' if resume else 'non'})", service="Compagnon") as infos:
+        resultat = _appeler(
+            compagnon.search,
+            prompt,
+            types,
+            int(top_k or TOP_K_COMPAGNON),
+            resume,
+            clarifications,
+        )
+        if not isinstance(resultat, dict):
+            resultat = {"results": resultat or {}}
+        infos["résultats"] = sum(len(v or []) for v in (resultat.get("results") or {}).values())
 
     documents = []
     for categorie, trouves in (resultat.get("results") or {}).items():

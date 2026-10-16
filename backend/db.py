@@ -1,6 +1,7 @@
 """Base SQLite des documents : pièces des dossiers, modèles d'actes et actes produits.
 
     python -m backend.db          # (ré)importe docs/ dans la base et affiche ce qu'elle contient
+    python -m backend.db --vider-cache [dossier]   # oublie les réponses en cache du serveur
 
 La base (``data/documents.db``) est créée et remplie au premier accès, à partir de :
 
@@ -17,6 +18,7 @@ aussi écrits dans ``out/actes_modifies/``, comme avant.
 import json
 import shutil
 import sqlite3
+import sys
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -50,6 +52,19 @@ CREATE TABLE IF NOT EXISTS actes (
     cree_le TEXT NOT NULL,
     contenu BLOB NOT NULL,
     rapport TEXT                        -- rapport des modifications, en JSON
+);
+CREATE TABLE IF NOT EXISTS mandats (
+    dossier TEXT PRIMARY KEY,           -- dossier créé depuis le frontend, pièces téléversées
+    modele  TEXT NOT NULL,              -- dossier fictif dont il reprend le modèle d'acte
+    titre   TEXT NOT NULL,              -- « Tremblay / Roy »
+    cree_le TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS reponses (
+    cle     TEXT PRIMARY KEY,           -- empreinte de la route et du corps de la requête
+    route   TEXT NOT NULL,
+    dossier TEXT NOT NULL,
+    cree_le TEXT NOT NULL,
+    reponse TEXT NOT NULL               -- réponse du serveur, en JSON
 );
 """
 
@@ -111,6 +126,64 @@ def dossiers_clients():
         return [nom for (nom,) in con.execute("SELECT DISTINCT dossier FROM pieces ORDER BY dossier")]
 
 
+def inventaire():
+    """Pour chaque dossier client : noms des pièces, modèles et actes produits (le plus récent d'abord).
+
+    Un mandat créé depuis le frontend reprend les modèles du dossier fictif choisi (``modele``)
+    et porte le titre saisi. Seuls des noms et des dates sortent d'ici : le texte des pièces
+    reste dans la base.
+    """
+    with _base() as con:
+        pieces = con.execute("SELECT dossier, nom FROM pieces ORDER BY dossier, nom").fetchall()
+        modeles = con.execute(
+            "SELECT dossier, nom, format, annote FROM modeles ORDER BY dossier, annote DESC, nom").fetchall()
+        actes = con.execute("SELECT dossier, nom, cree_le FROM actes ORDER BY cree_le DESC, id DESC").fetchall()
+        mandats = {d: (m, t) for d, m, t in con.execute("SELECT dossier, modele, titre FROM mandats")}
+    par_modele = {}
+    for dossier, nom, format_, annote in modeles:
+        par_modele.setdefault(dossier, []).append({"nom": nom, "format": format_, "annote": bool(annote)})
+    dossiers = {}
+    for dossier, nom in pieces:
+        if dossier not in dossiers:
+            modele, titre = mandats.get(dossier, (dossier, ""))
+            dossiers[dossier] = {"pieces": [], "modele": modele, "titre": titre,
+                                 "modeles": par_modele.get(modele, []), "actes": []}
+        dossiers[dossier]["pieces"].append(nom)
+    for dossier, nom, cree_le in actes:
+        if dossier in dossiers:
+            dossiers[dossier]["actes"].append({"nom": nom, "cree_le": cree_le})
+    return dossiers
+
+
+def modele_de(dossier):
+    """Dossier fictif dont ce dossier reprend le modèle d'acte (lui-même pour un dossier fictif)."""
+    with _base() as con:
+        ligne = con.execute("SELECT modele FROM mandats WHERE dossier = ?", (dossier,)).fetchone()
+    return ligne[0] if ligne else dossier
+
+
+def creer_mandat(dossier, modele, titre):
+    """Enregistre un mandat créé depuis le frontend ; ses pièces s'ajoutent avec ajouter_pieces."""
+    with _base() as con:
+        con.execute("INSERT INTO mandats (dossier, modele, titre, cree_le) VALUES (?, ?, ?, ?)",
+                    (dossier, modele, titre, datetime.now().isoformat(timespec="seconds")))
+
+
+def ajouter_pieces(dossier, pieces):
+    """Ajoute des pièces [(nom, texte)] au dossier, numérotées à la suite : « 5 - Courriel du client »."""
+    with _base() as con:
+        rang = con.execute("SELECT COUNT(*) FROM pieces WHERE dossier = ?", (dossier,)).fetchone()[0]
+        noms = []
+        for nom, texte in pieces:
+            noms.append(f"{rang} - {nom}")
+            con.execute(
+                "INSERT INTO pieces (dossier, nom, texte) VALUES (?, ?, ?)"
+                " ON CONFLICT (dossier, nom) DO UPDATE SET texte = excluded.texte",
+                (dossier, noms[-1], texte))
+            rang += 1
+    return noms
+
+
 def get_pieces(dossier):
     """Pièces txt du dossier, dans l'ordre : {nom de la pièce: texte}."""
     with _base() as con:
@@ -142,6 +215,8 @@ def get_acte_source(dossier=None, acte_id=None):
                 "Préciser le dossier : " + ", ".join(disponibles or ["aucun modèle disponible"]))
         dossier = disponibles[0]
 
+    # Un mandat créé depuis le frontend reprend le modèle du dossier fictif choisi.
+    dossier = modele_de(dossier)
     with _base() as con:
         modeles = con.execute(
             "SELECT nom, format, annote, contenu FROM modeles WHERE dossier = ? ORDER BY annote DESC, nom",
@@ -214,7 +289,45 @@ def get_acte(nom):
     return ligne[0] if ligne else None
 
 
+def reponse_en_cache(cle):
+    """Réponse déjà calculée pour cette requête (dict), ou None."""
+    with _base() as con:
+        ligne = con.execute("SELECT reponse FROM reponses WHERE cle = ?", (cle,)).fetchone()
+    return json.loads(ligne[0]) if ligne else None
+
+
+def derniere_reponse(route, dossier):
+    """Dernière réponse en cache pour cette étape de ce dossier (mode démo), ou None."""
+    with _base() as con:
+        ligne = con.execute(
+            "SELECT reponse FROM reponses WHERE route = ? AND dossier = ? ORDER BY cree_le DESC LIMIT 1",
+            (route, dossier or "")).fetchone()
+    return json.loads(ligne[0]) if ligne else None
+
+
+def mettre_en_cache(cle, route, dossier, reponse):
+    with _base() as con:
+        con.execute(
+            "INSERT INTO reponses (cle, route, dossier, cree_le, reponse) VALUES (?, ?, ?, ?, ?)"
+            " ON CONFLICT (cle) DO UPDATE SET reponse = excluded.reponse, cree_le = excluded.cree_le",
+            (cle, route, dossier or "", datetime.now().isoformat(timespec="seconds"),
+             json.dumps(reponse, ensure_ascii=False)),
+        )
+
+
+def vider_cache(dossier=None):
+    """Oublie les réponses en cache (d'un dossier, ou toutes) ; renvoie leur nombre."""
+    with _base() as con:
+        if dossier:
+            return con.execute("DELETE FROM reponses WHERE dossier = ?", (dossier,)).rowcount
+        return con.execute("DELETE FROM reponses").rowcount
+
+
 def main():
+    if "--vider-cache" in sys.argv:
+        dossier = next((a for a in sys.argv[1:] if not a.startswith("--")), None)
+        print(f"{vider_cache(dossier)} réponses retirées du cache")
+        return
     importer()
     with _base() as con:
         print(f"Base : {BASE}")
@@ -222,6 +335,7 @@ def main():
             ("pieces", "SELECT dossier, COUNT(*) FROM pieces GROUP BY dossier"),
             ("modeles", "SELECT dossier, GROUP_CONCAT(format, ', ') FROM modeles GROUP BY dossier"),
             ("actes", "SELECT dossier, COUNT(*) FROM actes GROUP BY dossier"),
+            ("reponses (cache)", "SELECT dossier, COUNT(*) FROM reponses GROUP BY dossier"),
         ):
             print(f"\n{table}")
             for dossier, valeur in con.execute(requete):

@@ -1,9 +1,11 @@
 import { useRef, useState, type MouseEvent } from "react";
+import { acteProduit } from "../api/backend";
+import type { Source } from "../api/source";
 import { BoutonPrincipal, BoutonSecondaire } from "../components/Base";
-import { Arborescence, BarreSuperieure, RailAugure } from "../components/Espace";
+import { Arborescence, BarreSuperieure, RailAugure, titreMandat } from "../components/Espace";
 import { Icon } from "../components/Icon";
 import { PanneauAugure } from "../components/PanneauAugure";
-import { CHARTE_V1, DOCUMENTS_EDITEUR, TITRE_MANDAT } from "../data/mandat";
+import type { ActeProduit, Mandat } from "../data/types";
 
 const STYLES_BLOC = [
   { libelle: "Paragraphe", balise: "p" },
@@ -15,13 +17,57 @@ function commande(nom: string, valeur?: string) {
   document.execCommand(nom, false, valeur);
 }
 
-export function Editeur({ onQuitter }: { onQuitter: () => void }) {
+/** « 2026-10-16T15:01:47 » → « 16 oct. 2026, 15 h 01 ». */
+function dateCourte(iso: string) {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleString("fr-CA", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+/** Éditeur d'un acte produit à l'étape 8. Les modifications restent dans la page : elles ne sont pas renvoyées au .docx. */
+export function Editeur({
+  mandat,
+  acte,
+  source,
+  onQuitter,
+  onAjouterPieces,
+}: {
+  mandat: Mandat;
+  acte: ActeProduit;
+  source: Source;
+  onQuitter: () => void;
+  onAjouterPieces?: (fichiers: File[]) => Promise<void>;
+}) {
   const [augure, setAugure] = useState(false);
   const [modifie, setModifie] = useState(false);
   const [version, setVersion] = useState(0);
   const [sauvegarde, setSauvegarde] = useState<string | null>(null);
-  const [selection, setSelection] = useState("G1");
+  const [courant, setCourant] = useState(acte);
+  const [erreur, setErreur] = useState("");
   const page = useRef<HTMLDivElement>(null);
+
+  // Les actes du dossier, le plus récent d'abord ; à défaut, l'acte reçu.
+  const actes = mandat.actes.length ? mandat.actes : [{ nom: acte.nom, creeLe: "", fichier: acte.fichier }];
+  const documents = actes.map((a, i) => ({
+    numero: `G${i + 1}`,
+    titre: a.creeLe ? `Projet d’acte du ${dateCourte(a.creeLe)}` : "Projet d’acte",
+  }));
+  const selection = documents[Math.max(0, actes.findIndex((a) => a.nom === courant.nom))]?.numero;
+
+  async function ouvrir(numero: string) {
+    const choisi = actes[Number(numero.slice(1)) - 1];
+    if (!choisi || choisi.nom === courant.nom || mandat.exemple) return;
+    setErreur("");
+    try {
+      setCourant(await acteProduit(choisi.nom));
+      setSauvegarde(null);
+      setModifie(false);
+      setVersion((v) => v + 1);
+    } catch (e) {
+      setErreur(`Impossible d’ouvrir cet acte : ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
 
   function annuler() {
     if (sauvegarde !== null && page.current) {
@@ -55,16 +101,28 @@ export function Editeur({ onQuitter }: { onQuitter: () => void }) {
 
   return (
     <div className="espace">
-      <BarreSuperieure onRetour={onQuitter} onBasculeAugure={() => setAugure(!augure)} />
+      <BarreSuperieure titre={titreMandat(mandat)} onRetour={onQuitter} onBasculeAugure={() => setAugure(!augure)} />
       <div className="zones">
-        <Arborescence generes={DOCUMENTS_EDITEUR} selection={selection} onSelection={setSelection} variante="editeur" />
+        <Arborescence
+          mandat={mandat}
+          generes={documents}
+          selection={selection}
+          onSelection={ouvrir}
+          variante="editeur"
+          onAjouterPieces={onAjouterPieces}
+        />
 
         <section className="milieu">
           <div className="outils">
             <div className="outils__document">
               <Icon nom="file" />
-              <span className="outils__nom">Projet de charte v1</span>
+              <span className="outils__nom">Projet d’acte</span>
               {modifie && <span className="pastille pastille--ambre pastille--ronde">Modifié</span>}
+              {courant.fichier && (
+                <a className="lien-accent" href={courant.fichier} download>
+                  Télécharger le .docx
+                </a>
+              )}
             </div>
             <div className="outils__forme" onMouseDown={garderFocus}>
               <label className="outils__style">
@@ -105,6 +163,7 @@ export function Editeur({ onQuitter }: { onQuitter: () => void }) {
           </div>
 
           <div className="canevas">
+            {erreur && <p className="echec">{erreur}</p>}
             <div
               key={version}
               ref={page}
@@ -114,11 +173,7 @@ export function Editeur({ onQuitter }: { onQuitter: () => void }) {
               spellCheck
               onInput={() => setModifie(true)}
             >
-              <h3 className="page__titre">CHARTE DE VIE COMMUNE</h3>
-              <p className="page__parties">Sarah Benoit et David Morin</p>
-              <p className="page__meta">Projet pour la rencontre du 2 novembre 2026</p>
-              <div className="page__filet" contentEditable={false} />
-              {CHARTE_V1.map((b, i) =>
+              {courant.blocs.map((b, i) =>
                 b.type === "titre" ? (
                   <h4 key={i} className="page__intertitre">
                     {b.texte}
@@ -130,11 +185,12 @@ export function Editeur({ onQuitter }: { onQuitter: () => void }) {
                 ) : (
                   <div key={i} className="discuter" contentEditable={false}>
                     <span className="discuter__etiquette">
-                      <Icon nom="sparkle-note" />À DISCUTER
+                      <Icon nom="sparkle-note" />À REVOIR
                     </span>
                     <p contentEditable suppressContentEditableWarning>
                       {b.texte}
                     </p>
+                    <p className="discuter__note">{b.note}</p>
                   </div>
                 ),
               )}
@@ -152,7 +208,8 @@ export function Editeur({ onQuitter }: { onQuitter: () => void }) {
 
         {augure ? (
           <PanneauAugure
-            contexte={`Mandat : ${TITRE_MANDAT}. Document ouvert : projet de charte v1.\n${page.current?.innerText ?? ""}`}
+            source={source}
+            contexte={`Mandat : ${titreMandat(mandat)}. Document ouvert : projet d’acte.\n${page.current?.innerText ?? ""}`}
             onFermer={() => setAugure(false)}
             onInserer={inserer}
           />

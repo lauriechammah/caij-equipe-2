@@ -16,6 +16,7 @@ import re
 import unicodedata
 
 from backend.config import EXTRACT_COMPAGNON
+from backend.journal import chrono
 from backend.llm import ask_augure, ask_compagnon, bloc_sources
 
 PROMPT_CONTRADICTIONS = """
@@ -146,6 +147,7 @@ def resume_droit_applicable(synthese, elements_factuels=None, demandes_clients=N
     return ask_compagnon(question[:900])
 
 
+@chrono("contradictions (prompt 6)")
 def get_contradictions(demandes_clients, commentaires, synthese, elements_factuels,
                        droit_applicable=None, model=None, dossier=None):
     """Relève toutes les contradictions possibles du dossier.
@@ -213,6 +215,7 @@ def _normaliser(texte):
     return re.sub(r"\s+", " ", sans_accent.lower()).strip()
 
 
+@chrono("conséquences (prompt 7)")
 def get_type_consequences(demandes_clients, commentaires, type_consequences_possibles,
                           synthese, elements_factuels, droit_applicable=None, model=None):
     """Relève les conséquences que les demandes pourraient entraîner.

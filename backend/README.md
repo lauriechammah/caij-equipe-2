@@ -19,13 +19,63 @@ cd frontend && npm install && npm run dev
 Le serveur écoute sur `http://localhost:8000` ; le proxy Vite lui envoie `/api/pipeline/*`.
 Chaque étape du pipeline du frontend appelle une route :
 
-| Étapes | Route (`POST /api/pipeline/…`) | Fonction |
+| Étapes | Route (`/api/pipeline/…`) | Fonction |
 | --- | --- | --- |
-| 2-3 | `synthese-demande-clients` | `synthesedemandeclients` (`fonctions.py`, prompts 2-3) |
-| 4-5 | `demandes-et-faits` | `getdemandeclientsetelementsfactuels` (`fonctions.py`, prompts 4-5) |
-| 6 | `contradictions` | `get_contradictions` (`analyse.py`, prompt 6) |
-| 7 | `consequences` | `get_type_consequences` (`analyse.py`, prompt 7) |
-| 8 | `acte` | `create_acte_modifie` (`acte.py`, prompt 8) ; `GET fichier/<nom>` télécharge le `.docx` |
+| Accueil | `GET dossiers` | `db.inventaire` : noms des pièces, modèles, actes produits (jamais le texte des pièces) |
+| Nouveau mandat | `POST mandats` | crée un dossier à partir de pièces téléversées, sur le modèle d'acte choisi |
+| Pièces | `POST pieces` | ajoute des pièces téléversées à un dossier (et vide son cache) |
+| 1 | `POST synthese-demande` | `synthese_demande` (`fonctions.py`, prompt 1) : noms des clients et synthèse |
+| 2-3 | `POST synthese-demande-clients` | `synthesedemandeclients` (`fonctions.py`, prompts 2-3) |
+| 4-5 | `POST demandes-et-faits` | `getdemandeclientsetelementsfactuels` (`fonctions.py`, prompts 4-5) |
+| 6 | `POST contradictions` | `get_contradictions` (`analyse.py`, prompt 6) |
+| 7 | `POST consequences` | `get_type_consequences` (`analyse.py`, prompt 7) |
+| 8 | `POST acte` | `create_acte_modifie` (`acte.py`, prompt 8) ; `GET fichier/<nom>` télécharge le `.docx` |
+| Éditeur | `GET actes/<nom>` | un acte déjà produit, en blocs, pour le rouvrir |
+| Augure | `POST question` | `repondre_question` (`fonctions.py`) : le panneau Augure, pièces du dossier à l'appui |
+
+### Pièces téléversées
+
+Le frontend envoie les fichiers en base64 ; `pieces.py` en extrait le texte (`.txt`, `.md`,
+`.docx` avec python-docx, tableaux compris). Un PDF ou un `.doc` est refusé avec un message
+clair : le pipeline transmet du texte à Augure. Un mandat créé ainsi est rangé dans la table
+`mandats` avec le dossier fictif dont il reprend le modèle d'acte (`db.modele_de`).
+
+### Cache et démo
+
+Chaque réponse d'étape est gardée dans la table `reponses` : une requête identique (même
+dossier, mêmes choix du notaire) revient en quelques millisecondes, en-tête `X-Cache: HIT`.
+Le panneau Augure n'est jamais en cache. Réglages dans `config.py` :
+
+| Réglage | Effet |
+| --- | --- |
+| `ARTICLES_MAX = 1` | étapes 2-3 : 3 requêtes, 5 candidats soumis à Augure, 1 article gardé (`None` : tous) |
+| `CACHE_REPONSES = True` | le cache ci-dessus |
+| `CACHE_DEMO = False` | `True` pour enregistrer une démo : une requête jamais vue reçoit la dernière réponse de la même étape du même dossier (en-tête `X-Cache: DEMO`) |
+
+Pour préparer une démo, lancer `python -m backend.bout_en_bout` une fois : il envoie les
+mêmes requêtes que l'écran et remplit le cache des six dossiers. `python -m backend.db
+--vider-cache [dossier]` l'oublie.
+
+### Journal : où passe le temps d'une étape
+
+Le serveur (et la CLI) écrit dans son terminal et dans `out/logs/backend.log` une ligne par
+sous-étape et par appel, chacune étiquetée `[route #numéro]` ; jamais le texte des pièces :
+
+```
+[synthese-demande-clients #3] Augure envoi : rosedale-1, effort medium, 52 340 car.
+[synthese-demande-clients #3] Augure 51.2 s : 1er octet à 0.4 s, 1er mot à 44.0 s, 3 210 car. reçus, raisonnement 9 800 car., fin stop, jetons 14 000 lus, 2 900 produits (57 jetons/s)
+[synthese-demande-clients #3] POST 200 en 98.7 s · cache MISS · Augure 3 appels 90.1 s · Compagnon 3 appels 8.2 s
+```
+
+« 1er mot » moins « 1er octet » : le temps de raisonnement d'Augure. Les reprises cachées
+(JSON illisible, `reasoning_cutoff`, 429) sont en `WARNING`. `CAIJ_LOG=DEBUG` ajoute les lignes
+HTTP brutes. Côté navigateur, la console affiche la durée de chaque appel et son `X-Cache`.
+
+Le prompt 1 (`PROMPT_SYNTHESE_DEMANDE`, `prompts.py`) n'était pas dans le document « Prompts for
+code » : il a été rédigé pour le serveur, à remplacer par celui de l'équipe s'il existe.
+
+Le frontend ne contient plus de dossier écrit en dur, sauf le mandat d'exemple (Benoit / Morin,
+`frontend/src/data/exemple.ts`), qui fonctionne sans backend.
 
 Les étapes 6 à 8 ne reçoivent que ce que le notaire a coché aux étapes précédentes. La liste
 des conséquences possibles du prompt 7 est `consequences_possibles.txt` (une par ligne, préfixée
@@ -130,6 +180,19 @@ chaque acte produit, que le serveur sert ensuite au téléchargement. Les actes 
 écrits dans `out/actes_modifies/`, comme avant.
 
 ## Essayer de bout en bout
+
+`bout_en_bout` rejoue le parcours du frontend (étapes 1 à 8, téléchargement, éditeur, panneau
+Augure) pour chaque dossier, par HTTP, avec les mêmes corps de requête que l'écran. Appels réels :
+compter une demi-heure à une heure pour les six dossiers, traités en parallèle. Seules des mesures
+s'affichent ; les réponses complètes sont dans `out/tests/bout_en_bout/<date>/`.
+
+```bash
+.venv/bin/python -m backend.serveur                                    # dans un autre terminal
+.venv/bin/python -m backend.bout_en_bout --base http://localhost:5173  # via le proxy Vite
+.venv/bin/python -m backend.bout_en_bout --dossiers mandat_protection  # un seul dossier
+```
+
+La CLI enchaîne aussi les étapes, sans le serveur :
 
 ```bash
 .venv/bin/python -m backend.cli acte --dossier mandat_protection --types nullité inaptitude

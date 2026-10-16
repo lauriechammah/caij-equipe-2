@@ -50,7 +50,8 @@
 
   --voile: #0f1e36;
 
-  --police-sans: "Source Sans 3", system-ui, sans-serif;
+  /* Police principale : Montserrat, celle du logo AnglesVivants. */
+  --police-sans: "Montserrat", system-ui, sans-serif;
   --police-serif: "Source Serif 4", Georgia, serif;
 
   --ombre-carte: 0 1px 1px rgba(15, 36, 64, 0.05);
