@@ -52,8 +52,8 @@ def essai_document():
         vide = Path(dossier_temporaire) / "vide"
         vide.mkdir()
         (vide / "x.docx").write_bytes(b"")
-        modeles = db.MODELES
-        db.MODELES = Path(dossier_temporaire)
+        modeles, base = db.MODELES, db.BASE
+        db.MODELES, db.BASE = Path(dossier_temporaire), Path(dossier_temporaire) / "vide.db"
         try:
             verifier(db.lister_dossiers() == ["vide"], "un seul modèle : le dossier est déduit")
             try:
@@ -62,7 +62,7 @@ def essai_document():
             except db.ErreurDocument:
                 verifier(True, "dossier inconnu : erreur explicite")
         finally:
-            db.MODELES = modeles
+            db.MODELES, db.BASE = modeles, base
 
 
 def essai_word():
@@ -197,8 +197,11 @@ def essai_acte_reel():
 
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
-    for essai in (essai_json, essai_document, essai_word, essai_analyse, essai_acte_reel):
-        essai()
+    # Une base jetable : les actes de démonstration n'encombrent pas data/documents.db.
+    with tempfile.TemporaryDirectory() as temporaire:
+        db.BASE, db.CACHE = Path(temporaire) / "essais.db", Path(temporaire) / "cache"
+        for essai in (essai_json, essai_document, essai_word, essai_analyse, essai_acte_reel):
+            essai()
     print(f"\n{_reussites} vérifications réussies, {_echecs} échecs")
     return 1 if _echecs else 0
 

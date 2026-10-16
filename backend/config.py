@@ -14,6 +14,8 @@ SORTIE = ROOT / "out" / "actes_modifies"
 
 MODELE_AUGURE = "rosedale-1"
 EFFORT_AUGURE = "high"
+# Sans plafond explicite, rosedale-1 peut épuiser son budget en raisonnement (reasoning_cutoff).
+MAX_TOKENS_AUGURE = 64000
 TYPES_COMPAGNON = ["legislation", "jurisprudence", "doctrine"]
 TOP_K_COMPAGNON = 10
 EXTRACT_COMPAGNON = 1500

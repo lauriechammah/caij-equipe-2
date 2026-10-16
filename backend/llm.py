@@ -25,6 +25,7 @@ from pathlib import Path
 from backend.config import (
     EFFORT_AUGURE,
     EXTRACT_COMPAGNON,
+    MAX_TOKENS_AUGURE,
     REPETITIONS,
     PAUSE_REPETITION,
     TYPES_COMPAGNON,
@@ -165,6 +166,7 @@ def ask_augure(prompt, dossier=None, modele=False, fichiers=(), sortie_json=True
             "messages": [{"role": "user", "content": contenu}],
             "stream": True,
             "reasoning_effort": reglages["effort"],
+            "max_tokens": MAX_TOKENS_AUGURE,
         }
         if forcer_json:
             charge["response_format"] = {"type": "json_object"}
@@ -173,6 +175,9 @@ def ask_augure(prompt, dossier=None, modele=False, fichiers=(), sortie_json=True
         except ErreurLLM as erreur:
             if forcer_json and essai == 0 and "response_format" in str(erreur):
                 forcer_json = False
+                continue
+            if "reasoning_cutoff" in str(erreur) and reglages["effort"] != "low":
+                reglages["effort"] = "low"
                 continue
             raise
         if not sortie_json:

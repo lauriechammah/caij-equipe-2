@@ -1,83 +1,179 @@
-"""Source de l'acte à modifier — squelette, la base de données arrive plus tard.
+"""Base SQLite des documents : pièces des dossiers, modèles d'actes et actes produits.
 
-Pour l'instant le document de départ est cherché sur le disque :
+    python -m backend.db          # (ré)importe docs/ dans la base et affiche ce qu'elle contient
 
-- ``docs/modeles/<dossier>/*_not.docx`` : le modèle d'acte Word, version annotée
-  des auteurs du Répertoire ;
-- à défaut, le seul ``.docx`` du dossier ;
-- à défaut d'argument, l'unique modèle disponible dans ``docs/modeles``.
+La base (``data/documents.db``) est créée et remplie au premier accès, à partir de :
 
-Le jour où la base existe, seules ``get_acte_source`` et ``lister_dossiers`` sont
-à réécrire : le reste du backend n'appelle que ces deux fonctions.
-Les actes produits sont déposés dans ``out/actes_modifies/`` et retournés en
-chemin : le frontend s'en sert pour proposer le téléchargement.
+- ``docs/dossiers_fictifs/<dossier>/txt/*.txt`` : les pièces des dossiers clients ;
+- ``docs/modeles/<dossier>/`` : les modèles d'actes (.docx, .doc et .pdf annoté).
+
+Les actes produits y sont archivés avec leur rapport (``archiver_acte``).
+
+python-docx et Augure veulent des fichiers : ``get_acte_source`` extrait le modèle
+Word et ses PDF dans ``data/cache/<dossier>/`` et renvoie ce chemin. Les actes sont
+aussi écrits dans ``out/actes_modifies/``, comme avant.
 """
 
+import json
 import shutil
+import sqlite3
+from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 
-from backend.config import MODELES, valeurs
+from backend.config import DOSSIERS, MODELES, ROOT, valeurs
+
+BASE = ROOT / "data" / "documents.db"
+CACHE = ROOT / "data" / "cache"
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS pieces (
+    id      INTEGER PRIMARY KEY,
+    dossier TEXT NOT NULL,              -- charte_vie_commune, mandat_protection, …
+    nom     TEXT NOT NULL,              -- « 0 - Mise en contexte et mandat »
+    texte   TEXT NOT NULL,
+    UNIQUE (dossier, nom)
+);
+CREATE TABLE IF NOT EXISTS modeles (
+    id      INTEGER PRIMARY KEY,
+    dossier TEXT NOT NULL,
+    nom     TEXT NOT NULL,              -- nom du fichier d'origine
+    format  TEXT NOT NULL,              -- docx, doc ou pdf
+    annote  INTEGER NOT NULL,           -- 1 : version annotée des auteurs (_not)
+    contenu BLOB NOT NULL,
+    UNIQUE (dossier, nom)
+);
+CREATE TABLE IF NOT EXISTS actes (
+    id      INTEGER PRIMARY KEY,
+    dossier TEXT NOT NULL,
+    nom     TEXT NOT NULL UNIQUE,       -- nom du .docx produit
+    cree_le TEXT NOT NULL,
+    contenu BLOB NOT NULL,
+    rapport TEXT                        -- rapport des modifications, en JSON
+);
+"""
 
 
 class ErreurDocument(RuntimeError):
     """Aucun document de départ ne correspond à la demande."""
 
 
-def _modeles(dossier=None):
-    dossiers = [MODELES / dossier] if dossier else sorted(p for p in MODELES.iterdir() if p.is_dir())
-    return dossiers
+@contextmanager
+def _base():
+    """Connexion à la base, créée et remplie à partir de docs/ si elle est vide."""
+    BASE.parent.mkdir(parents=True, exist_ok=True)
+    con = sqlite3.connect(BASE)
+    try:
+        with con:
+            con.executescript(SCHEMA)
+            if not con.execute("SELECT 1 FROM pieces UNION ALL SELECT 1 FROM modeles LIMIT 1").fetchone():
+                _importer(con)
+            yield con
+    finally:
+        con.close()
+
+
+def _importer(con):
+    for dossier in sorted(p for p in DOSSIERS.iterdir() if p.is_dir()) if DOSSIERS.is_dir() else []:
+        for piece in sorted((dossier / "txt").glob("*.txt")):
+            con.execute(
+                "INSERT INTO pieces (dossier, nom, texte) VALUES (?, ?, ?)"
+                " ON CONFLICT (dossier, nom) DO UPDATE SET texte = excluded.texte",
+                (dossier.name, piece.stem, piece.read_text(encoding="utf-8")),
+            )
+    for dossier in sorted(p for p in MODELES.iterdir() if p.is_dir()) if MODELES.is_dir() else []:
+        for fichier in sorted(dossier.iterdir()):
+            if fichier.suffix.lower() in (".docx", ".doc", ".pdf"):
+                con.execute(
+                    "INSERT INTO modeles (dossier, nom, format, annote, contenu) VALUES (?, ?, ?, ?, ?)"
+                    " ON CONFLICT (dossier, nom) DO UPDATE SET contenu = excluded.contenu",
+                    (dossier.name, fichier.name, fichier.suffix[1:].lower(),
+                     int("_not" in fichier.stem), fichier.read_bytes()),
+                )
+
+
+def importer():
+    """(Ré)importe les pièces et les modèles de docs/ dans la base."""
+    with _base() as con:
+        _importer(con)
 
 
 def lister_dossiers():
     """Noms des dossiers pour lesquels un modèle Word est disponible."""
-    noms = []
-    for dossier in _modeles():
-        if list(dossier.glob("*.docx")):
-            noms.append(dossier.name)
-    return noms
+    with _base() as con:
+        return [nom for (nom,) in con.execute(
+            "SELECT DISTINCT dossier FROM modeles WHERE format = 'docx' ORDER BY dossier")]
+
+
+def dossiers_clients():
+    """Noms des dossiers qui ont des pièces."""
+    with _base() as con:
+        return [nom for (nom,) in con.execute("SELECT DISTINCT dossier FROM pieces ORDER BY dossier")]
+
+
+def get_pieces(dossier):
+    """Pièces txt du dossier, dans l'ordre : {nom de la pièce: texte}."""
+    with _base() as con:
+        pieces = dict(con.execute("SELECT nom, texte FROM pieces WHERE dossier = ? ORDER BY nom", (dossier,)))
+    if not pieces:
+        raise ErreurDocument(f"Dossier inconnu : {dossier}")
+    return pieces
 
 
 def get_acte_source(dossier=None, acte_id=None):
-    """Renvoie le chemin du document Word à modifier.
+    """Renvoie le chemin du document Word à modifier, extrait de la base.
 
     ``dossier`` : nom du dossier fictif (``mandat_protection``, …).
-    ``acte_id`` : identifiant de l'acte dans la base ; pour l'instant traité
-    comme un nom de dossier.
+    ``acte_id`` : identifiant d'un acte déjà produit (table ``actes``) pour le
+    reprendre ; un nom de dossier est aussi accepté, comme avant la base.
     """
+    if acte_id is not None and str(acte_id).isdigit():
+        with _base() as con:
+            ligne = con.execute("SELECT dossier, nom, contenu FROM actes WHERE id = ?", (int(acte_id),)).fetchone()
+        if ligne is None:
+            raise ErreurDocument(f"Acte introuvable : {acte_id}")
+        return _extraire(ligne[0], ligne[1], ligne[2])
     if dossier is None and acte_id:
         dossier = acte_id
     if dossier is None:
         disponibles = lister_dossiers()
-        if len(disponibles) == 1:
-            dossier = disponibles[0]
-        else:
+        if len(disponibles) != 1:
             raise ErreurDocument(
-                "Préciser le dossier : " + ", ".join(disponibles or ["aucun modèle disponible"])
-            )
+                "Préciser le dossier : " + ", ".join(disponibles or ["aucun modèle disponible"]))
+        dossier = disponibles[0]
 
-    dossier = MODELES / dossier
-    if not dossier.is_dir():
+    with _base() as con:
+        modeles = con.execute(
+            "SELECT nom, format, annote, contenu FROM modeles WHERE dossier = ? ORDER BY annote DESC, nom",
+            (dossier,)).fetchall()
+    if not modeles:
         raise ErreurDocument(f"Dossier introuvable : {dossier}")
-
-    annotes = sorted(dossier.glob("*_not.docx")) + sorted(dossier.glob("*_not.doc"))
-    autres = [p for p in sorted(dossier.glob("*.docx")) if p not in annotes]
-    documents = annotes or autres
-    if not documents:
-        anciens = sorted(dossier.glob("*.doc"))
+    word = [m for m in modeles if m[1] == "docx"]
+    if not word:
+        anciens = [m[0] for m in modeles if m[1] == "doc"]
         if anciens:
             raise ErreurDocument(
-                f"{dossier.name} : le modèle est en .doc (Word 97-2003), que python-docx ne lit "
-                f"pas. Le convertir d'abord en .docx :\n"
-                f"    soffice --headless --convert-to docx \"{anciens[0]}\""
-            )
-        raise ErreurDocument(f"Aucun modèle Word dans {dossier}")
-    return documents[0]
+                f"{dossier} : le modèle est en .doc (Word 97-2003), que python-docx ne lit "
+                f"pas. Le convertir d'abord en .docx, puis relancer python -m backend.db :\n"
+                f"    soffice --headless --convert-to docx \"{MODELES / dossier / anciens[0]}\"")
+        raise ErreurDocument(f"Aucun modèle Word pour {dossier}")
+    # Les PDF annotés accompagnent le Word : acte.py les cherche à côté de lui.
+    for nom, format_, _, contenu in modeles:
+        if format_ == "pdf":
+            _extraire(dossier, nom, contenu)
+    return _extraire(dossier, word[0][0], word[0][3])
+
+
+def _extraire(dossier, nom, contenu):
+    chemin = CACHE / dossier / nom
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    if not chemin.exists() or chemin.stat().st_size != len(contenu):
+        chemin.write_bytes(contenu)
+    return chemin
 
 
 def chemin_sortie(dossier=None, suffixe="docx"):
     """Chemin d'écriture d'un acte modifié, daté pour ne rien écraser."""
-    from datetime import datetime
-
     sortie = valeurs()["sortie"]
     sortie.mkdir(parents=True, exist_ok=True)
     horodatage = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -96,3 +192,41 @@ def enregistrer(contenu, chemin):
     else:
         contenu.save(str(chemin))
     return chemin
+
+
+def archiver_acte(chemin, dossier=None, rapport=None):
+    """Archive un acte produit et son rapport dans la base ; renvoie son identifiant."""
+    chemin = Path(chemin)
+    with _base() as con:
+        con.execute(
+            "INSERT INTO actes (dossier, nom, cree_le, contenu, rapport) VALUES (?, ?, ?, ?, ?)"
+            " ON CONFLICT (nom) DO UPDATE SET contenu = excluded.contenu, rapport = excluded.rapport",
+            (dossier or "", chemin.name, datetime.now().isoformat(timespec="seconds"), chemin.read_bytes(),
+             json.dumps(rapport, ensure_ascii=False, default=str) if rapport is not None else None),
+        )
+        return con.execute("SELECT id FROM actes WHERE nom = ?", (chemin.name,)).fetchone()[0]
+
+
+def get_acte(nom):
+    """Contenu (octets) d'un acte archivé, ou None."""
+    with _base() as con:
+        ligne = con.execute("SELECT contenu FROM actes WHERE nom = ?", (nom,)).fetchone()
+    return ligne[0] if ligne else None
+
+
+def main():
+    importer()
+    with _base() as con:
+        print(f"Base : {BASE}")
+        for table, requete in (
+            ("pieces", "SELECT dossier, COUNT(*) FROM pieces GROUP BY dossier"),
+            ("modeles", "SELECT dossier, GROUP_CONCAT(format, ', ') FROM modeles GROUP BY dossier"),
+            ("actes", "SELECT dossier, COUNT(*) FROM actes GROUP BY dossier"),
+        ):
+            print(f"\n{table}")
+            for dossier, valeur in con.execute(requete):
+                print(f"  {dossier or '(sans dossier)'} : {valeur}")
+
+
+if __name__ == "__main__":
+    main()

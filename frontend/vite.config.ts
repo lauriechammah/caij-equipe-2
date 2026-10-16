@@ -20,6 +20,8 @@ export default defineConfig(({ mode }) => {
           rewrite: (path) => path.replace(/^\/api\/augure/, ""),
           headers: { Authorization: `Bearer ${env.AUGURE_API_KEY ?? ""}` },
         },
+        // Backend Python (python -m backend.serveur).
+        "/api/pipeline": "http://localhost:8000",
       },
     },
   };

@@ -9,6 +9,28 @@ cp .env.example .env          # puis AUGURE_API_KEY
 .venv/bin/python -m backend.essais      # 41 vérifications, sans clé ni appel réseau
 ```
 
+## Lancer l'application (backend + frontend)
+
+```bash
+.venv/bin/python -m backend.serveur     # Windows : .venv\Scripts\python -m backend.serveur
+cd frontend && npm install && npm run dev
+```
+
+Le serveur écoute sur `http://localhost:8000` ; le proxy Vite lui envoie `/api/pipeline/*`.
+Chaque étape du pipeline du frontend appelle une route :
+
+| Étapes | Route (`POST /api/pipeline/…`) | Fonction |
+| --- | --- | --- |
+| 2-3 | `synthese-demande-clients` | `synthesedemandeclients` (`fonctions.py`, prompts 2-3) |
+| 4-5 | `demandes-et-faits` | `getdemandeclientsetelementsfactuels` (`fonctions.py`, prompts 4-5) |
+| 6 | `contradictions` | `get_contradictions` (`analyse.py`, prompt 6) |
+| 7 | `consequences` | `get_type_consequences` (`analyse.py`, prompt 7) |
+| 8 | `acte` | `create_acte_modifie` (`acte.py`, prompt 8) ; `GET fichier/<nom>` télécharge le `.docx` |
+
+Les étapes 6 à 8 ne reçoivent que ce que le notaire a coché aux étapes précédentes. La liste
+des conséquences possibles du prompt 7 est `consequences_possibles.txt` (une par ligne, préfixée
+par le type d'acte) : seules celles du type d'acte du dossier sont envoyées (`TYPES_ACTE`, `serveur.py`).
+
 ## Les deux appels, un prompt chacun
 
 ```python
@@ -89,10 +111,23 @@ sont pas, `db.get_acte_source` le dit explicitement.
 
 ## La base de données
 
-`db.py` est un squelette : le document de départ est cherché dans `docs/modeles/<dossier>/`
-et les actes écrits dans `out/actes_modifies/`. Quand la base existera, il n'y aura qu'à
-réécrire `get_acte_source` et `lister_dossiers` ; le reste du backend n'appelle que ces deux
-fonctions.
+`db.py` tient une base SQLite, `data/documents.db` (ignorée par git), créée et remplie au
+premier accès à partir de `docs/` :
+
+| Table | Contenu |
+| --- | --- |
+| `pieces` | les pièces txt de chaque dossier (`docs/dossiers_fictifs/<dossier>/txt/`) |
+| `modeles` | les modèles d'actes `.docx`, `.doc` et `.pdf` (`docs/modeles/<dossier>/`) |
+| `actes` | chaque acte produit par `create_acte_modifie`, avec son rapport JSON |
+
+```bash
+.venv/bin/python -m backend.db     # réimporte docs/ et affiche le contenu de la base
+```
+
+`get_pieces(dossier)` alimente le serveur ; `get_acte_source(dossier)` extrait le modèle Word
+(et ses PDF annotés) dans `data/cache/` pour python-docx et Augure ; `archiver_acte` garde
+chaque acte produit, que le serveur sert ensuite au téléchargement. Les actes sont aussi
+écrits dans `out/actes_modifies/`, comme avant.
 
 ## Essayer de bout en bout
 

@@ -554,6 +554,7 @@ def create_acte_modifie(synthese, demandes_clients, commentaires, elements_factu
     rapport["plan"] = plan
     chemin.with_suffix(".rapport.json").write_text(
         json.dumps(rapport, ensure_ascii=False, indent=2), encoding="utf-8")
+    db.archiver_acte(chemin, dossier, rapport)
     return str(chemin)
 
 
