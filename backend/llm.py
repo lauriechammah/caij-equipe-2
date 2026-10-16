@@ -17,6 +17,7 @@ d'Augure est refaite ici (``_stream_chat``), pour mesurer chaque appel dans le j
 Une source inventée disqualifie : rien n'est ajouté ici aux résultats du Compagnon.
 """
 
+import http.client
 import importlib.util
 import json
 import re
@@ -36,6 +37,10 @@ from backend.config import (
     valeurs,
 )
 from backend.journal import SuiviAugure, chrono, journal, nombre
+
+# Erreurs d'Augure après lesquelles on rappelle avec moins de raisonnement.
+RELANCES = ("reasoning_cutoff", "upstream_stream_idle", "upstream_error", "connexion interrompue")
+EFFORT_REPLI = {"high": "low", "medium": "low", "low": "none"}
 
 CONSIGNE_JSON = (
     "Réponds uniquement par un objet JSON valide, sans texte avant ni après, "
@@ -108,12 +113,14 @@ def _taille_contenu(contenu):
 def _stream_chat(cle, charge):
     """``augure.stream_chat``, mesuré dans le journal ; une erreur reste un ``sys.exit`` pour ``_appeler``."""
     with SuiviAugure(charge, _taille_contenu(charge["messages"][-1]["content"])) as suivi:
-        with augure.request("POST", "/chat/completions", cle, charge) as resp:
-            suivi.entetes()
-            try:
+        try:
+            with augure.request("POST", "/chat/completions", cle, charge) as resp:
+                suivi.entetes()
                 texte = lire_flux(resp, suivi)
-            except AugureError as erreur:
-                sys.exit(f"Erreur Augure : {erreur}")
+        except AugureError as erreur:
+            sys.exit(f"Erreur Augure : {erreur}")
+        except (OSError, http.client.HTTPException) as erreur:
+            sys.exit(f"Erreur Augure : connexion interrompue ({erreur})")
         suivi.recu(texte)
     return texte
 
@@ -189,7 +196,8 @@ def ask_augure(prompt, dossier=None, modele=False, fichiers=(), sortie_json=True
 
     reponse = ""
     forcer_json = sortie_json
-    for essai in range(2):
+    essais_json = 0
+    while True:
         charge = {
             "model": reglages["model"],
             "messages": [{"role": "user", "content": contenu}],
@@ -204,14 +212,18 @@ def ask_augure(prompt, dossier=None, modele=False, fichiers=(), sortie_json=True
         try:
             reponse = _appeler(_stream_chat, reglages["cle"], charge)
         except ErreurLLM as erreur:
-            if forcer_json and essai == 0 and "response_format" in str(erreur):
+            if forcer_json and "response_format" in str(erreur):
                 journal.warning("Augure refuse response_format : nouvel appel sans")
                 forcer_json = False
                 continue
-            if "reasoning_cutoff" in str(erreur) and reglages["effort"] != "low":
-                journal.warning("Augure a épuisé son budget de raisonnement (effort %s) : nouvel appel en effort low",
-                                reglages["effort"])
-                reglages["effort"] = "low"
+            # Raisonnement trop long (budget épuisé, flux muet 90 s, connexion coupée) :
+            # on recommence avec moins de raisonnement plutôt que d'échouer.
+            repli = EFFORT_REPLI.get(reglages["effort"])
+            cause = next((c for c in RELANCES if c in str(erreur)), None)
+            if repli and cause:
+                journal.warning("Augure sans réponse (%s, effort %s) : nouvel appel en effort %s",
+                                cause, reglages["effort"], repli)
+                reglages["effort"] = repli
                 continue
             raise
         if not sortie_json:
@@ -219,10 +231,12 @@ def ask_augure(prompt, dossier=None, modele=False, fichiers=(), sortie_json=True
         donnees = extraire_json(reponse)
         if donnees is not None:
             return donnees
-        if essai == 0:
-            journal.warning("réponse d'Augure illisible en JSON (%s car.) : second appel complet",
-                            nombre(len(reponse)))
-            contenu = contenu[:-1] + [{"type": "text", "text": f"{prompt}\n\n{CONSIGNE_JSON_RENOUVEL}"}]
+        essais_json += 1
+        if essais_json >= 2:
+            break
+        journal.warning("réponse d'Augure illisible en JSON (%s car.) : second appel complet",
+                        nombre(len(reponse)))
+        contenu = contenu[:-1] + [{"type": "text", "text": f"{prompt}\n\n{CONSIGNE_JSON_RENOUVEL}"}]
     journal.warning("toujours pas de JSON après deux appels : la réponse brute est renvoyée")
     return {"reponse_brute": reponse, "json": False}
 
